@@ -830,9 +830,7 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 
 	// =========================== make Images / derivatives etc. =========================
 	fh->ab_exposure = image->exposure_time;
-	fh->makeImages(image->image, image->overexposedMap, &Hcalib);
-
-
+    fh->makeImages(image->image, image->overexposedMap, &Hcalib);　///< 准备好这一帧中维护的图像
 
 
 	if(!initialized)

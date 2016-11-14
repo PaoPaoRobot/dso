@@ -168,6 +168,9 @@ void FrameHessian::makeImages(float* color, bool* everexpMap, CalibHessian* HCal
 			for(int y=0;y<hl;y++)
 				for(int x=0;x<wl;x++)
 				{
+                    /**
+                     * 上层灰度等于４个下层灰度的平均值
+                     */
 					dI_l[x + y*wl][0] = 0.25f * (dI_lm[2*x   + 2*y*wlm1][0] +
 												dI_lm[2*x+1 + 2*y*wlm1][0] +
 												dI_lm[2*x   + 2*y*wlm1+wlm1][0] +
@@ -175,6 +178,9 @@ void FrameHessian::makeImages(float* color, bool* everexpMap, CalibHessian* HCal
 
 					if(setting_killOverexposedMode == 1)
 					{
+                        /**
+                         *　如果下层４个点都过曝光，那么上层该像素过曝光
+                         */
 						ov_l[x + y*wl] =        (ov_lm[2*x   + 2*y*wlm1] &&
 													ov_lm[2*x+1 + 2*y*wlm1] &&
 													ov_lm[2*x   + 2*y*wlm1+wlm1] &&
@@ -182,6 +188,9 @@ void FrameHessian::makeImages(float* color, bool* everexpMap, CalibHessian* HCal
 					}
 					if(setting_killOverexposedMode == 2)
 					{
+                        /**
+                         *　如果下层４个点存在一个过曝光，那么上层该像素过曝光
+                         */
 						ov_l[x + y*wl] =        (ov_lm[2*x   + 2*y*wlm1] ||
 													ov_lm[2*x+1 + 2*y*wlm1] ||
 													ov_lm[2*x   + 2*y*wlm1+wlm1] ||
@@ -192,7 +201,14 @@ void FrameHessian::makeImages(float* color, bool* everexpMap, CalibHessian* HCal
 
 		for(int idx=wl;idx < wl*(hl-1);idx++)
 		{
+            /**
+             * @brief u方向的中心差分
+             */
 			float dx = 0.5f*(dI_l[idx+1][0] - dI_l[idx-1][0]);
+
+            /**
+             * @brief v方向的中心差分
+             */
 			float dy = 0.5f*(dI_l[idx+wl][0] - dI_l[idx-wl][0]);
 
 
@@ -207,6 +223,9 @@ void FrameHessian::makeImages(float* color, bool* everexpMap, CalibHessian* HCal
 
 			if(setting_gammaWeightsPixelSelect==1 && HCalib!=0)
 			{
+                /**
+                 * @brief 曝光矫正过后的梯度
+                 */
 				float gw = HCalib->getBGradOnly((float)(dI_l[idx][0]));
 				dabs_l[idx] *= gw*gw;	// convert to gradient of original color space (before removing response).
 			}

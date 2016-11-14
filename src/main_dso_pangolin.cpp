@@ -375,13 +375,14 @@ int main( int argc, char** argv )
 
 
 	FullSystem* fullSystem = new FullSystem();
-	fullSystem->setGammaFunction(reader->getPhotometricGamma());
+
+    /**
+     * 得到gamma值，这个是在光度校准部分，光度校准分为两步，首先是矫正了响应函数，
+     * 在这一步可以得到camera response function G，是一个堆离散的点，每个曝光时间对应一个值
+     */
+    fullSystem->setGammaFunction(reader->getPhotometricGamma());
+
 	fullSystem->linearizeOperation = (playbackSpeed==0);
-
-
-
-
-
 
 
 	if(!disableAllDisplay)
@@ -389,6 +390,10 @@ int main( int argc, char** argv )
 
 	std::vector<int> idsToPlay;
 	std::vector<double> timesToPlayAt;
+
+    /**
+     * 得到每帧图的曝光时间
+     */
 	for(int i=lstart;i>= 0 && i< reader->getNumImages() && linc*i < linc*lend;i+=linc)
 	{
 		idsToPlay.push_back(i);
@@ -458,8 +463,10 @@ int main( int argc, char** argv )
 		}
 
 
-
-		if(!skipFrame) fullSystem->addActiveFrame(img, i);
+        /**
+         * 前面都是准备工作，现在正式开始跑dso
+         */
+        if(!skipFrame) fullSystem->addActiveFrame(img, i);
 
 
 
