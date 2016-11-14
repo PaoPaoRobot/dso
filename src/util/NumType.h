@@ -165,8 +165,8 @@ typedef Eigen::Matrix<double,14,1> Vec14;
 // transforms points from one frame to another.
 struct AffLight
 {
-	AffLight(double a_, double b_) : a(a_), b(b_) {};
-	AffLight() : a(0), b(0) {};
+    AffLight(double a_, double b_) : a(a_), b(b_) {}
+    AffLight() : a(0), b(0) {}
 
 	// Affine Parameters:
 	double a,b;	// I_frame = exp(a)*I_global + b. // I_global = exp(-a)*(I_frame - b).
@@ -176,8 +176,6 @@ struct AffLight
 		if(exposureF==0 || exposureT==0)
 		{
 			exposureT = exposureF = 1;
-			//printf("got exposure value of 0! please choose the correct model.\n");
-			//assert(setting_brightnessTransferFunc < 2);
 		}
 
 		double a = exp(g2T.a-g2F.a) * exposureT / exposureF;

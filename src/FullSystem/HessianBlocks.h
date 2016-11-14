@@ -116,10 +116,10 @@ struct FrameHessian
 	ImageAndExposure* orgImg;	// only a pointer, allocation not managed from here.
 
 	Eigen::Vector3f* dI;				 // trace, fine tracking. Used for direction select (not for gradient histograms etc.)
-	Eigen::Vector3f* dIp[PYR_LEVELS];	 // coarse tracking / coarse initializer. NAN in [0] only.
-	float* absSquaredGrad[PYR_LEVELS];  // only used for pixel select (histograms etc.). no NAN.
+    Eigen::Vector3f* dIp[PYR_LEVELS];	 // coarse tracking / coarse initializer. NAN in [0] only.　///< ０维度是亮度，１维度是u方向的梯度值，2维度是v方向的梯度值
+    float* absSquaredGrad[PYR_LEVELS];  // only used for pixel select (histograms etc.). no NAN.　///< 梯度模的平方
 	bool* overexposedMap;
-	bool* overexposedMapp[PYR_LEVELS];
+    bool* overexposedMapp[PYR_LEVELS];  ///< 过曝光图，dso对每个像素点有一个过曝光的判别
 
 	Eigen::Vector3f* dI_OriginalImage;	// distorted, very original image.
 
