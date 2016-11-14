@@ -782,12 +782,13 @@ void CoarseInitializer::setFirst(	CalibHessian* HCalib, FrameHessian* newFrameHe
 		else
 			npts = makePixelStatus(firstFrame->dIp[lvl], statusMapB, w[lvl], h[lvl], densities[lvl]*w[0]*h[0]);
 
-
-
 		if(points[lvl] != 0) delete[] points[lvl];
 		points[lvl] = new Pnt[npts];
 
 		// set idepth map to initially 1 everywhere.
+        /**
+         * 存储梯度表现的比较好的像素点
+         */
 		int wl = w[lvl], hl = h[lvl];
 		Pnt* pl = points[lvl];
 		int nl = 0;
@@ -797,8 +798,7 @@ void CoarseInitializer::setFirst(	CalibHessian* HCalib, FrameHessian* newFrameHe
 			//if(x==2) printf("y=%d!\n",y);
 			if((lvl!=0 && statusMapB[x+y*wl]) || (lvl==0 && statusMap[x+y*wl] != 0))
 			{
-				//assert(patternNum==9);
-				pl[nl].u = x+0.1;
+                pl[nl].u = x+0.1;    ///< 为什么加0.1呢?
 				pl[nl].v = y+0.1;
 				pl[nl].idepth = 1;
 				pl[nl].iR = 1;
@@ -809,18 +809,18 @@ void CoarseInitializer::setFirst(	CalibHessian* HCalib, FrameHessian* newFrameHe
 				pl[nl].my_type= (lvl!=0) ? 1 : statusMap[x+y*wl];
 
 				Eigen::Vector3f* cpt = firstFrame->dIp[lvl] + x + y*w[lvl];
-				float sumGrad2=0;
+                float sumGrad2=0;   ///< 这个数据未使用？
 				for(int idx=0;idx<patternNum;idx++)
 				{
+                    ///< 得到pattern的模板，模板8
 					int dx = patternP[idx][0];
 					int dy = patternP[idx][1];
-					float absgrad = cpt[dx + dy*w[lvl]].tail<2>().squaredNorm();
+                    float absgrad = cpt[dx + dy*w[lvl]].tail<2>().squaredNorm();  ///< 算梯度的模的平方
 					sumGrad2 += absgrad;
 				}
 
 //				float gth = setting_outlierTH * (sqrtf(sumGrad2)+setting_outlierTHSumComponent);
 //				pl[nl].outlierTH = patternNum*gth*gth;
-//
 
 				pl[nl].outlierTH = patternNum*setting_outlierTH;
 
@@ -832,7 +832,7 @@ void CoarseInitializer::setFirst(	CalibHessian* HCalib, FrameHessian* newFrameHe
 		}
 
 
-		numPoints[lvl]=nl;
+        numPoints[lvl]=nl;   ///< 记录每一层有多少好点
 	}
 	delete[] statusMap;
 	delete[] statusMapB;

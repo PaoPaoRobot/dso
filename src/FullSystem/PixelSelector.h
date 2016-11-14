@@ -26,7 +26,7 @@
 
 
 #include "util/NumType.h"
-
+#include "util/settings.h"
 
  
 
@@ -40,7 +40,14 @@ const float minUseGrad_pixsel = 10;
 template<int pot>
 inline int gridMaxSelection(Eigen::Vector3f* grads, bool* map_out, int w, int h, float THFac)
 {
-
+    /**
+     * |_|_|_|_|
+     * |_|_|#|_|
+     * |_|_|_|_|
+     * x = 2, y = 1的时候表达#那块的索引
+     * 之后遍历那一块
+     * dx, dy从0开始如果满足阈值条件，那么翻转为true，并且计数器加1
+     */
 	memset(map_out, 0, sizeof(bool)*w*h);
 
 	int numGood = 0;
@@ -198,7 +205,7 @@ inline int gridMaxSelection(Eigen::Vector3f* grads, bool* map_out, int w, int h,
 
 inline int makePixelStatus(Eigen::Vector3f* grads, bool* map, int w, int h, float desiredDensity, int recsLeft=5, float THFac = 1)
 {
-	if(sparsityFactor < 1) sparsityFactor = 1;
+    if(sparsityFactor < 1) sparsityFactor = 1;
 
 	int numGoodPoints;
 
@@ -223,7 +230,7 @@ inline int makePixelStatus(Eigen::Vector3f* grads, bool* map, int w, int h, floa
 
 	float quotia = numGoodPoints / (float)(desiredDensity);
 
-	int newSparsity = (sparsityFactor * sqrtf(quotia))+0.7f;
+    int newSparsity = (sparsityFactor * sqrtf(quotia))+0.7f; ///< 公式哪里来的
 
 
 	if(newSparsity < 1) newSparsity=1;

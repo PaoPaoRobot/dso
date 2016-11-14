@@ -333,7 +333,7 @@ Eigen::Vector3i PixelSelector::select(const FrameHessian* const fh,
     /**
      * 接下来的部分，首先是在构造对象的时候初始化了一系列随机数，用来随机选择前面directions的方向
      * 然后我们需要知道map_out里面存储的是这个点在金字塔第几层是好点(前三层给你玩)
-     * 接下来是时候忙活了，pot是当前的潜在个数？，反正我查了一下，等于3,这个值还和idealPotential有关
+     * 接下来是时候忙活了，pot是当前的潜在个数？，反正我查了一下，等于3,这个值还和idealPotential有关，用于决定选择的点的个数
      * 再后面就在循环了，x4 y4表示一次跳4 * pot这么多格，x3 y3表示一次跳2 * pot, x2 y2表示一次跳pot这么多
      * 之后寻址，依次对第0层，第1层，第2层的梯度值进行了操作，具体操作如下：
      * 首先是得到阈值(详见makeHists)：
