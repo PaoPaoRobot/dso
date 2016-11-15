@@ -961,13 +961,12 @@ void CoarseInitializer::makeK(CalibHessian* HCalib)
 void CoarseInitializer::makeNN()
 {
 	const float NNDistFactor=0.05;
-
 	typedef nanoflann::KDTreeSingleIndexAdaptor<
 			nanoflann::L2_Simple_Adaptor<float, FLANNPointcloud> ,
 			FLANNPointcloud,2> KDTree;
 
 	// build indices
-	FLANNPointcloud pcs[PYR_LEVELS];
+    FLANNPointcloud pcs[PYR_LEVELS];    ///< 对每层金字塔进行kd-tree
 	KDTree* indexes[PYR_LEVELS];
 	for(int i=0;i<pyrLevelsUsed;i++)
 	{
@@ -1028,8 +1027,6 @@ void CoarseInitializer::makeNN()
 			}
 		}
 	}
-
-
 
 	// done.
 

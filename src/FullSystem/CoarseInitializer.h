@@ -162,15 +162,17 @@ private:
 };
 
 
-
-
 struct FLANNPointcloud
 {
-	inline FLANNPointcloud() {num=0; points=0;};
-	inline FLANNPointcloud(int n, Pnt* p) :  num(n), points(p) {};
+    inline FLANNPointcloud() {num=0; points=0;}
+    inline FLANNPointcloud(int n, Pnt* p) :  num(n), points(p) {}
 	int num;
 	Pnt* points;
 	inline size_t kdtree_get_point_count() const { return num; }
+
+    /**
+     * @brief 计算距离的方法，这个函数定义比较重要，在L2_Simple_Adaptor里面有一个内部的调用
+     */
 	inline float kdtree_distance(const float *p1, const size_t idx_p2,size_t /*size*/) const
 	{
 		const float d0=p1[0]-points[idx_p2].u;
