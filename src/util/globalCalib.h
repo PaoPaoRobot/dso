@@ -29,14 +29,14 @@
 
 namespace dso
 {
-	extern int wG[PYR_LEVELS], hG[PYR_LEVELS];
-	extern float fxG[PYR_LEVELS], fyG[PYR_LEVELS],
-		  cxG[PYR_LEVELS], cyG[PYR_LEVELS];
+    extern int wG[PYR_LEVELS], hG[PYR_LEVELS];       ///< 图像的宽度和高度
+    extern float fxG[PYR_LEVELS], fyG[PYR_LEVELS],   ///< 相机焦距
+          cxG[PYR_LEVELS], cyG[PYR_LEVELS];          ///< 光心
 
-	extern float fxiG[PYR_LEVELS], fyiG[PYR_LEVELS],
-		  cxiG[PYR_LEVELS], cyiG[PYR_LEVELS];
+    extern float fxiG[PYR_LEVELS], fyiG[PYR_LEVELS], ///< 逆焦距
+          cxiG[PYR_LEVELS], cyiG[PYR_LEVELS];        ///< 逆光心
 
-	extern Eigen::Matrix3f KG[PYR_LEVELS],KiG[PYR_LEVELS];
+    extern Eigen::Matrix3f KG[PYR_LEVELS],KiG[PYR_LEVELS]; ///< 相机矩阵
 
 	extern float wM3G;
 	extern float hM3G;

@@ -47,6 +47,11 @@ public:
 
 
 	bool allowFast;
+
+    /**
+     * @brief 生成图像直方图特征
+     * @param frame
+     */
 	void makeHists(const FrameHessian* const fh);
 private:
 
