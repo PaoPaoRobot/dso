@@ -74,14 +74,17 @@ CoarseInitializer::~CoarseInitializer()
 }
 
 
-bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, IOWrap::Output3DWrapper* wrap)
+bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IOWrap::Output3DWrapper*> &wraps)
 {
-    newFrame = newFrameHessian;                             ///< firstFrame已在setFirst设置
-    if(wrap != 0) wrap->pushLiveFrame(newFrameHessian);     ///< 画图用
+    newFrame = newFrameHessian;                            ///< firstFrame已在setFirst设置
+
+    for(IOWrap::Output3DWrapper* ow : wraps)
+        ow->pushLiveFrame(newFrameHessian);                ///< 画图用
+
 
 	int maxIterations[] = {5,5,10,30,50};
 
-	float alphaEnergyLog[PYR_LEVELS];
+
 
 	alphaK = 2.5*2.5;//*freeDebugParam1*freeDebugParam1;
 	alphaW = 150*150;//*freeDebugParam2*freeDebugParam2;
@@ -119,7 +122,7 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, IOWrap::Output
 	for(int lvl=pyrLevelsUsed-1; lvl>=0; lvl--)
 	{
 
-		alphaEnergyLog[lvl] = 0;
+
 
 		if(lvl<pyrLevelsUsed-1)
 			propagateDown(lvl+1);
@@ -206,7 +209,7 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, IOWrap::Output
 
 			if(accept)
 			{
-				alphaEnergyLog[lvl] = resNew[1] / (alphaK*numPoints[lvl]);
+
 				if(resNew[1] == alphaK*numPoints[lvl])
 					snapped = true;
 				H = H_new;
@@ -265,15 +268,21 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, IOWrap::Output
 
 
 
-	if(wrap !=0) debugPlot(0,wrap);
+    debugPlot(0,wraps);
 
 
 
 	return snapped && frameID > snappedAt+5;
 }
 
-void CoarseInitializer::debugPlot(int lvl, IOWrap::Output3DWrapper* wrap)
+void CoarseInitializer::debugPlot(int lvl, std::vector<IOWrap::Output3DWrapper*> &wraps)
 {
+    bool needCall = false;
+    for(IOWrap::Output3DWrapper* ow : wraps)
+        needCall = needCall || ow->needPushDepthImage();
+    if(!needCall) return;
+
+
 	int wl = w[lvl], hl = h[lvl];
 	Eigen::Vector3f* colorRef = firstFrame->dIp[lvl];
 
@@ -312,17 +321,8 @@ void CoarseInitializer::debugPlot(int lvl, IOWrap::Output3DWrapper* wrap)
 
 
 	//IOWrap::displayImage("idepth-R", &iRImg, false);
-	wrap->pushDepthImage(&iRImg);
-}
-
-void CoarseInitializer::debugPlotFull()
-{
-
-}
-
-void CoarseInitializer::debugPlotFullHessians()
-{
-
+    for(IOWrap::Output3DWrapper* ow : wraps)
+        ow->pushDepthImage(&iRImg);
 }
 
 // calculates residual, Hessian and Hessian-block neede for re-substituting depth.

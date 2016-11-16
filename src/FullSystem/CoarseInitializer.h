@@ -82,7 +82,7 @@ public:
 
 
 	void setFirst(	CalibHessian* HCalib, FrameHessian* newFrameHessian);
-	bool trackFrame(FrameHessian* newFrameHessian, IOWrap::Output3DWrapper* wrap);
+    bool trackFrame(FrameHessian* newFrameHessian, std::vector<IOWrap::Output3DWrapper*> &wraps);
 	void calcTGrads(FrameHessian* newFrameHessian);
 
 	int frameID;
@@ -185,9 +185,7 @@ private:
 
 	void makeGradients(Eigen::Vector3f** data);
 
-	void debugPlot(int lvl, IOWrap::Output3DWrapper* wrap=0);
-	void debugPlotFull();
-	void debugPlotFullHessians();
+    void debugPlot(int lvl, std::vector<IOWrap::Output3DWrapper*> &wraps);
 	void makeNN();
 };
 

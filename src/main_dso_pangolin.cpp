@@ -47,6 +47,7 @@
 
 
 #include "IOWrapper/Pangolin/PangolinDSOViewer.h"
+#include "IOWrapper/OutputWrapper/SampleOutputWrapper.h"
 
 
 std::string vignette = "";
@@ -61,6 +62,8 @@ int end=100000;
 bool prefetch = false;
 float playbackSpeed=0;	// 0 for linearize (play as fast as possible, while sequentializing tracking & mapping). otherwise, factor on timestamps.
 bool preload=false;
+bool useSampleOutput=false;
+
 
 int mode=0;
 
@@ -151,6 +154,26 @@ void parseArgument(char* arg)
 	float foption;
 	char buf[1000];
 
+
+    if(1==sscanf(arg,"sampleoutput=%d",&option))
+    {
+        if(option==1)
+        {
+            useSampleOutput = true;
+            printf("USING SAMPLE OUTPUT WRAPPER!\n");
+        }
+        return;
+    }
+
+    if(1==sscanf(arg,"quiet=%d",&option))
+    {
+        if(option==1)
+        {
+            setting_debugout_runquiet = true;
+            printf("QUIET MODE, I'll shut up!\n");
+        }
+        return;
+    }
 
 	if(1==sscanf(arg,"preset=%d",&option))
 	{
@@ -336,7 +359,7 @@ void parseArgument(char* arg)
 
 int main( int argc, char** argv )
 {
-	setlocale(LC_ALL, "");
+	//setlocale(LC_ALL, "");
 
 	for(int i=1; i<argc;i++)
 		parseArgument(argv[i]);
@@ -386,7 +409,15 @@ int main( int argc, char** argv )
 
 
 	if(!disableAllDisplay)
-		fullSystem->outputWrapper = new IOWrap::PangolinDSOViewer(wG[0],hG[0]);
+		fullSystem->outputWrapper.push_back(new IOWrap::PangolinDSOViewer(wG[0],hG[0]));
+
+
+
+    if(useSampleOutput)
+        fullSystem->outputWrapper.push_back(new IOWrap::SampleOutputWrapper());
+
+
+
 
 	std::vector<int> idsToPlay;
 	std::vector<double> timesToPlayAt;
@@ -478,14 +509,18 @@ int main( int argc, char** argv )
 			if(ii < 250 || setting_fullResetRequested)
 			{
 				printf("RESETTING!\n");
-				IOWrap::Output3DWrapper* outputWrapper = fullSystem->outputWrapper;
+
+				std::vector<IOWrap::Output3DWrapper*> wraps = fullSystem->outputWrapper;
 				delete fullSystem;
-				if(outputWrapper != 0) outputWrapper->reset();
+
+				for(IOWrap::Output3DWrapper* ow : wraps) ow->reset();
 
 				fullSystem = new FullSystem();
 				fullSystem->setGammaFunction(reader->getPhotometricGamma());
 				fullSystem->linearizeOperation = (playbackSpeed==0);
-				fullSystem->outputWrapper = outputWrapper;
+
+
+				fullSystem->outputWrapper = wraps;
 
 				setting_fullResetRequested=false;
 			}
@@ -523,7 +558,7 @@ int main( int argc, char** argv )
 			MilliSecondsTakenMT / (float)numFramesProcessed,
 			1000 / (MilliSecondsTakenSingle/numSecondsProcessed),
 			1000 / (MilliSecondsTakenMT / numSecondsProcessed));
-	fullSystem->printFrameLifetimes();
+    //fullSystem->printFrameLifetimes();
 	if(setting_logStuff)
 	{
 		std::ofstream tmlog;
@@ -534,11 +569,12 @@ int main( int argc, char** argv )
 		tmlog.close();
 	}
 
-	if(fullSystem->outputWrapper != 0)
+	for(IOWrap::Output3DWrapper* ow : fullSystem->outputWrapper)
 	{
-		fullSystem->outputWrapper->join();
-		delete fullSystem->outputWrapper;
+		ow->join();
+		delete ow;
 	}
+
 
 
 	printf("DELETE FULLSYSTEM!\n");
