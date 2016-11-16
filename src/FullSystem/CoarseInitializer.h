@@ -89,7 +89,7 @@ public:
 	bool fixAffine;
 	bool printDebug;
 
-	Pnt* points[PYR_LEVELS];
+    Pnt* points[PYR_LEVELS];      ///< on firstFrmame
 	int numPoints[PYR_LEVELS];
 	AffLight thisToNext_aff;
 	SE3 thisToNext;

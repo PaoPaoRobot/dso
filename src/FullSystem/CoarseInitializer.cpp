@@ -108,9 +108,12 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, IOWrap::Output
 	SE3 refToNew_current = thisToNext;
 	AffLight refToNew_aff_current = thisToNext_aff;
 
-	if(firstFrame->ab_exposure>0 && newFrame->ab_exposure>0)
+    if(firstFrame->ab_exposure>0 && newFrame->ab_exposure>0) {
+        /**
+         * refToNew_aff_current.a = ln(t_new / t_first) , refToNew_aff_current.b = 0
+         */
 		refToNew_aff_current = AffLight(logf(newFrame->ab_exposure /  firstFrame->ab_exposure),0); // coarse approximation.
-
+    }
 
 	Vec3f latestRes = Vec3f::Zero();
 	for(int lvl=pyrLevelsUsed-1; lvl>=0; lvl--)
@@ -335,6 +338,9 @@ Vec3f CoarseInitializer::calcResAndGS(
 
 	Mat33f RKi = (refToNew.rotationMatrix() * Ki[lvl]).cast<float>();
 	Vec3f t = refToNew.translation().cast<float>();
+    /**
+     * 一开始的时候r2new_aff[0] = t_new / t_first, r2new_aff[1] = 0，注意时间的比值存储的是对数
+     */
 	Eigen::Vector2f r2new_aff = Eigen::Vector2f(exp(refToNew_aff.a), refToNew_aff.b);
 
 	float fxl = fx[lvl];
@@ -358,8 +364,8 @@ Vec3f CoarseInitializer::calcResAndGS(
 		point->maxstep = 1e10;
 		if(!point->isGood)
 		{
-			E.updateSingle((float)(point->energy[0]));
-			point->energy_new = point->energy;
+            E.updateSingle((float)(point->energy[0]));  ///< energy初始化的时候为0, resetPoint后为0,applyStep后会更新
+            point->energy_new = point->energy;
 			point->isGood_new = false;
 			continue;
 		}
@@ -384,13 +390,17 @@ Vec3f CoarseInitializer::calcResAndGS(
 			int dx = patternP[idx][0];
 			int dy = patternP[idx][1];
 
-
+            /**
+             * d(u,v,1)^T = d'*R*Kinv(u',v',1)^T + t
+             * (Ku,Kv,1)^T = K(u,v,1)^T
+             * 这里变到尺度为1进行计算
+             */
 			Vec3f pt = RKi * Vec3f(point->u+dx, point->v+dy, 1) + t*point->idepth_new;
 			float u = pt[0] / pt[2];
 			float v = pt[1] / pt[2];
 			float Ku = fxl * u + cxl;
 			float Kv = fyl * v + cyl;
-			float new_idepth = point->idepth_new/pt[2];
+            float new_idepth = point->idepth_new/pt[2];
 
 			if(!(Ku > 1 && Kv > 1 && Ku < wl-2 && Kv < hl-2 && new_idepth > 0))
 			{
@@ -398,10 +408,8 @@ Vec3f CoarseInitializer::calcResAndGS(
 				break;
 			}
 
-			Vec3f hitColor = getInterpolatedElement33(colorNew, Ku, Kv, wl);
-			//Vec3f hitColor = getInterpolatedElement33BiCub(colorNew, Ku, Kv, wl);
+            Vec3f hitColor = getInterpolatedElement33(colorNew, Ku, Kv, wl); ///< 双线性插值
 
-			//float rlR = colorRef[point->u+dx + (point->v+dy) * wl][0];
 			float rlR = getInterpolatedElement31(colorRef, point->u+dx, point->v+dy, wl);
 
 			if(!std::isfinite(rlR) || !std::isfinite((float)hitColor[0]))
@@ -410,28 +418,60 @@ Vec3f CoarseInitializer::calcResAndGS(
 				break;
 			}
 
-
+            /** residual = I_new - (a * I_first + b)
+             *  a = \frac{t_new * exp(a_new)}{t_first * exp(a_first)}
+             *  b = b_new - b_first
+             *  注意，firstFrame上的点是不动的
+             */
 			float residual = hitColor[0] - r2new_aff[0] * rlR - r2new_aff[1];
 			float hw = fabs(residual) < setting_huberTH ? 1 : setting_huberTH / fabs(residual);
 			energy += hw *residual*residual*(2-hw);
 
+            /**
+             * u = x / d
+             * v = y / d
+             * new_idepth = id = 1/d = 1/pt[2]
+             * pt = R * Kinv(u', v', 1)^T + t * id'
+             */
 
+            /**
+             * u = x(id') / d(id')
+             * \frac{\partial u}{\partial id'} = \frac{x'd - d'x}{d^2}
+             *                                 = \frac{t[0] * d - t[2] * x}{d^2}
+             *                                 = \frac{t[0] - t[2] * u}{pt[2]}
+             */
+            float dxdd = (t[0]-t[2]*u)/pt[2];
 
-
-			float dxdd = (t[0]-t[2]*u)/pt[2];
+            /**
+             * v = y(id') / d(id')
+             * \frac{\partial v}{\partial id'} = \frac{y'd - d'y}{d^2}
+             *                                 = \frac{t[1] * d - t[2] * y}{d^2}
+             *                                 = \frac{t[1] - t[2] * v}{pt[2]}
+             */
 			float dydd = (t[1]-t[2]*v)/pt[2];
 
 			if(hw < 1) hw = sqrtf(hw);
 			float dxInterp = hw*hitColor[1]*fxl;
 			float dyInterp = hw*hitColor[2]*fyl;
-			dp0[idx] = new_idepth*dxInterp;
-			dp1[idx] = new_idepth*dyInterp;
-			dp2[idx] = -new_idepth*(u*dxInterp + v*dyInterp);
-			dp3[idx] = -u*v*dxInterp - (1+v*v)*dyInterp;
-			dp4[idx] = (1+u*u)*dxInterp + u*v*dyInterp;
-			dp5[idx] = -v*dxInterp + u*dyInterp;
+            /**
+             * dp0->5: \frac{\partial r}{\parital \xi_nr} = hw(\frac{\partial I_new}{\partial u}, \frac{\partial I_new}{\partial v}) *
+             *                                               \left ( \begin{array} fx/d & 0 & -xfx/d^2 \\ 0 & fy/d & -yfy/d^2 \end{array} \right ) *
+             *                                              (I, -((x,y,d)^T)^{\time})
+             * dp6: \frac{\partial r}{\parital a} = -hw * exp(a) * I_ref
+             * dp7: \frac{\partial r}{\parital b} = -hw
+             */
+            dp0[idx] = new_idepth*dxInterp;                   ///< dp0 = hw * \frac{\partial I_new}{\partial u} * fx / d
+            dp1[idx] = new_idepth*dyInterp;                   ///< dp1 = hw * \frac{\partial I_new}{\partial v} * fd / d
+            dp2[idx] = -new_idepth*(u*dxInterp + v*dyInterp); ///< dp2 = -hw * \frac{x*fx * \frac{\partial I_new}{\partial u} + y*fy * \frac{\partial I_new}{\partial v}}{d^2}
+            dp3[idx] = -u*v*dxInterp - (1+v*v)*dyInterp;      ///< dp3 = -hw(\frac{x}{d} * \frac{y}{d} * \frac{\partial I_new}{\partial u} * fx + (1 + \frac{y^2}{d^2}) * \frac{\partial I_new}{\partial v} * fy
+            dp4[idx] = (1+u*u)*dxInterp + u*v*dyInterp;       ///< dp4 = hw(1 + \frac{x^2}{d^2} * \frac{\partial I_new}{\partial u} * fx + \frac{x}{d} * \frac{y}{d} * \frac{\partial I_new}{\partial v} * fy)
+            dp5[idx] = -v*dxInterp + u*dyInterp;              ///< dp5 = -frac{y}{d} * \frac{\partial I_new}{\partial u} * fx + frac{x}{d} * \frac{\partial I_new}{\partial v} * fy
 			dp6[idx] = - hw*r2new_aff[0] * rlR;
 			dp7[idx] = - hw*1;
+
+            /**
+             * \frac{\partial r}{\partial id'} = grad(I_new) * (\frac{\partial u}{\partial id'}, \frac{\partial v}{\partial id'})^T
+             */
 			dd[idx] = dxInterp * dxdd  + dyInterp * dydd;
 			r[idx] = hw*residual;
 
@@ -490,11 +530,6 @@ Vec3f CoarseInitializer::calcResAndGS(
 
 	E.finish();
 	acc9.finish();
-
-
-
-
-
 
 	// calculate alpha energy, and decide if we cap it.
 	Accumulator11 EAlpha;
