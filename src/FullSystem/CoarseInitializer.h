@@ -136,6 +136,18 @@ private:
 	float regWeight;
 	float couplingWeight;
 
+    /**
+     * @brief calculates residual, Hessian and Hessian-block needed for re-substituting depth.
+     * @param 指定层
+     * @param H_out
+     * @param b_out
+     * @param H_out_sc
+     * @param b_out_sc
+     * @param refToNew
+     * @param refToNew_aff
+     * @param plot
+     * @return
+     */
 	Vec3f calcResAndGS(
 			int lvl,
 			Mat88f &H_out, Vec8f &b_out,
@@ -143,12 +155,30 @@ private:
 			SE3 refToNew, AffLight refToNew_aff,
 			bool plot);
 	Vec3f calcEC(int lvl); // returns OLD NERGY, NEW ENERGY, NUM TERMS.
+
+    /**
+     * @brief 算一个加权平均(根据neighbour平滑一下idepth)
+     * @param 层数
+     */
 	void optReg(int lvl);
 
+    /**
+     * @brief 把当src层的idepth上传
+     * @param src层
+     */
 	void propagateUp(int srcLvl);
+
+    /**
+     * @brief 把当src层的idepth下传
+     * @param src层
+     */
 	void propagateDown(int srcLvl);
 	float rescale();
 
+    /**
+     * @brief 把idepth初始化进行完毕,并设置energy=0
+     * @param 指定层
+     */
 	void resetPoints(int lvl);
 	void doStep(int lvl, float lambda, Vec8f inc);
 	void applyStep(int lvl);

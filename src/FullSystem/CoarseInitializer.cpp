@@ -76,8 +76,8 @@ CoarseInitializer::~CoarseInitializer()
 
 bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, IOWrap::Output3DWrapper* wrap)
 {
-	newFrame = newFrameHessian;
-	if(wrap != 0) wrap->pushLiveFrame(newFrameHessian);
+    newFrame = newFrameHessian;                             ///< firstFrame已在setFirst设置
+    if(wrap != 0) wrap->pushLiveFrame(newFrameHessian);     ///< 画图用
 
 	int maxIterations[] = {5,5,10,30,50};
 
@@ -321,6 +321,7 @@ void CoarseInitializer::debugPlotFullHessians()
 {
 
 }
+
 // calculates residual, Hessian and Hessian-block neede for re-substituting depth.
 Vec3f CoarseInitializer::calcResAndGS(
 		int lvl, Mat88f &H_out, Vec8f &b_out,
@@ -655,8 +656,8 @@ void CoarseInitializer::optReg(int lvl)
 
 		if(nnn > 2)
 		{
-			std::nth_element(idnn,idnn+nnn/2,idnn+nnn);
-			point->iR = (1-regWeight)*point->idepth + regWeight*idnn[nnn/2];
+            std::nth_element(idnn,idnn+nnn/2,idnn+nnn);                      ///<前n/2个元素小于第n/2个元素，后n/2个元素大于n/2个元素
+            point->iR = (1-regWeight)*point->idepth + regWeight*idnn[nnn/2]; ///< 用neighbours的中位数算加权平均
 		}
 	}
 
@@ -719,16 +720,19 @@ void CoarseInitializer::propagateDown(int srcLvl)
 		Pnt* point = ptst+i;
 		Pnt* parent = ptss+point->parent;
 
-		if(!parent->isGood || parent->lastHessian < 0.1) continue;
-		if(!point->isGood)
+        if(!parent->isGood || parent->lastHessian < 0.1) continue;        ///< makeNN已经设置好parent,good才传
+        if(!point->isGood)                                                ///< 点本身不行
 		{
 			point->iR = point->idepth = point->idepth_new = parent->iR;
 			point->isGood=true;
 			point->lastHessian=0;
 		}
-		else
+        else                                                             ///< 这个点不错
 		{
-			float newiR = (point->iR*point->lastHessian*2 + parent->iR*parent->lastHessian) / (point->lastHessian*2+parent->lastHessian);
+            /**
+             *  加权平均，当前点占2分，parent占1分
+             */
+            float newiR = (point->iR*point->lastHessian*2 + parent->iR*parent->lastHessian) / (point->lastHessian*2+parent->lastHessian);
 			point->iR = point->idepth = point->idepth_new = newiR;
 		}
 	}
@@ -764,7 +768,7 @@ void CoarseInitializer::setFirst(	CalibHessian* HCalib, FrameHessian* newFrameHe
 {
 
 	makeK(HCalib);
-	firstFrame = newFrameHessian;
+    firstFrame = newFrameHessian;       ///< 在这里初始化了firstFrame
 
 	PixelSelector sel(w[0],h[0]);
 
@@ -857,8 +861,7 @@ void CoarseInitializer::resetPoints(int lvl)
 		pts[i].energy.setZero();
 		pts[i].idepth_new = pts[i].idepth;
 
-
-		if(lvl==pyrLevelsUsed-1 && !pts[i].isGood)
+        if(lvl==pyrLevelsUsed-1 && !pts[i].isGood)         ///< 如果是最顶层,则算一下加权平均
 		{
 			float snd=0, sn=0;
 			for(int n = 0;n<10;n++)
@@ -966,16 +969,16 @@ void CoarseInitializer::makeNN()
 			FLANNPointcloud,2> KDTree;
 
 	// build indices
-    FLANNPointcloud pcs[PYR_LEVELS];    ///< 对每层金字塔进行kd-tree
+    FLANNPointcloud pcs[PYR_LEVELS];    ///< 需要对每层金字塔进行kd-tree
 	KDTree* indexes[PYR_LEVELS];
 	for(int i=0;i<pyrLevelsUsed;i++)
 	{
-		pcs[i] = FLANNPointcloud(numPoints[i], points[i]);
+        pcs[i] = FLANNPointcloud(numPoints[i], points[i]);       ///< 初始化每一层的distance type
 		indexes[i] = new KDTree(2, pcs[i], nanoflann::KDTreeSingleIndexAdaptorParams(5) );
-		indexes[i]->buildIndex();
+        indexes[i]->buildIndex();                                ///< 生成index
 	}
 
-	const int nn=10;
+    const int nn=10;                                   ///< 10个neighbours
 
 	// find NN & parents
 	for(int lvl=0;lvl<pyrLevelsUsed;lvl++)
@@ -985,8 +988,8 @@ void CoarseInitializer::makeNN()
 
 		int ret_index[nn];
 		float ret_dist[nn];
-		nanoflann::KNNResultSet<float, int, int> resultSet(nn);
-		nanoflann::KNNResultSet<float, int, int> resultSet1(1);
+        nanoflann::KNNResultSet<float, int, int> resultSet(nn);     ///< k = 10
+        nanoflann::KNNResultSet<float, int, int> resultSet1(1);     ///< k = 1
 
 		for(int i=0;i<npts;i++)
 		{
@@ -998,15 +1001,15 @@ void CoarseInitializer::makeNN()
 			float sumDF = 0;
 			for(int k=0;k<nn;k++)
 			{
-				pts[i].neighbours[myidx]=ret_index[k];
-				float df = expf(-ret_dist[k]*NNDistFactor);
+                pts[i].neighbours[myidx]=ret_index[k];               ///< 注意，在这个部分吧当前点的neighbours存储了
+                float df = expf(-ret_dist[k]*NNDistFactor);          ///< neighbour距离公式
 				sumDF += df;
-				pts[i].neighboursDist[myidx]=df;
+                pts[i].neighboursDist[myidx]=df;                     ///< 存储了neighbour对应的距离
 				assert(ret_index[k]>=0 && ret_index[k] < npts);
 				myidx++;
 			}
 			for(int k=0;k<nn;k++)
-				pts[i].neighboursDist[k] *= 10/sumDF;
+                pts[i].neighboursDist[k] *= 10/sumDF;               ///< 把距离计算为比值
 
 
 			if(lvl < pyrLevelsUsed-1 )
@@ -1015,8 +1018,8 @@ void CoarseInitializer::makeNN()
 				pt = pt*0.5f-Vec2f(0.25f,0.25f);
 				indexes[lvl+1]->findNeighbors(resultSet1, (float*)&pt, nanoflann::SearchParams());
 
-				pts[i].parent = ret_index[0];
-				pts[i].parentDist = expf(-ret_dist[0]*NNDistFactor);
+                pts[i].parent = ret_index[0];                         ///< 找到上一层对应的点
+                pts[i].parentDist = expf(-ret_dist[0]*NNDistFactor);
 
 				assert(ret_index[0]>=0 && ret_index[0] < numPoints[lvl+1]);
 			}
