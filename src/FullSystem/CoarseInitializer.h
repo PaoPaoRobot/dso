@@ -82,14 +82,14 @@ public:
 
 
 	void setFirst(	CalibHessian* HCalib, FrameHessian* newFrameHessian);
-	bool trackFrame(FrameHessian* newFrameHessian, IOWrap::Output3DWrapper* wrap);
+    bool trackFrame(FrameHessian* newFrameHessian, std::vector<IOWrap::Output3DWrapper*> &wraps);
 	void calcTGrads(FrameHessian* newFrameHessian);
 
 	int frameID;
 	bool fixAffine;
 	bool printDebug;
 
-	Pnt* points[PYR_LEVELS];
+    Pnt* points[PYR_LEVELS];      ///< on firstFrmame
 	int numPoints[PYR_LEVELS];
 	AffLight thisToNext_aff;
 	SE3 thisToNext;
@@ -136,6 +136,18 @@ private:
 	float regWeight;
 	float couplingWeight;
 
+    /**
+     * @brief calculates residual, Hessian and Hessian-block needed for re-substituting depth.
+     * @param 指定层
+     * @param H_out
+     * @param b_out
+     * @param H_out_sc
+     * @param b_out_sc
+     * @param refToNew
+     * @param refToNew_aff
+     * @param plot
+     * @return
+     */
 	Vec3f calcResAndGS(
 			int lvl,
 			Mat88f &H_out, Vec8f &b_out,
@@ -143,34 +155,52 @@ private:
 			SE3 refToNew, AffLight refToNew_aff,
 			bool plot);
 	Vec3f calcEC(int lvl); // returns OLD NERGY, NEW ENERGY, NUM TERMS.
+
+    /**
+     * @brief 算一个加权平均(根据neighbour平滑一下idepth)
+     * @param 层数
+     */
 	void optReg(int lvl);
 
+    /**
+     * @brief 把当src层的idepth上传
+     * @param src层
+     */
 	void propagateUp(int srcLvl);
+
+    /**
+     * @brief 把当src层的idepth下传
+     * @param src层
+     */
 	void propagateDown(int srcLvl);
 	float rescale();
 
+    /**
+     * @brief 把idepth初始化进行完毕,并设置energy=0
+     * @param 指定层
+     */
 	void resetPoints(int lvl);
 	void doStep(int lvl, float lambda, Vec8f inc);
 	void applyStep(int lvl);
 
 	void makeGradients(Eigen::Vector3f** data);
 
-	void debugPlot(int lvl, IOWrap::Output3DWrapper* wrap=0);
-	void debugPlotFull();
-	void debugPlotFullHessians();
+    void debugPlot(int lvl, std::vector<IOWrap::Output3DWrapper*> &wraps);
 	void makeNN();
 };
 
 
-
-
 struct FLANNPointcloud
 {
-	inline FLANNPointcloud() {num=0; points=0;};
-	inline FLANNPointcloud(int n, Pnt* p) :  num(n), points(p) {};
+    inline FLANNPointcloud() {num=0; points=0;}
+    inline FLANNPointcloud(int n, Pnt* p) :  num(n), points(p) {}
 	int num;
 	Pnt* points;
 	inline size_t kdtree_get_point_count() const { return num; }
+
+    /**
+     * @brief 计算距离的方法，这个函数定义比较重要，在L2_Simple_Adaptor里面有一个内部的调用
+     */
 	inline float kdtree_distance(const float *p1, const size_t idx_p2,size_t /*size*/) const
 	{
 		const float d0=p1[0]-points[idx_p2].u;

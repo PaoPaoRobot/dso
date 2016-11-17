@@ -74,14 +74,17 @@ CoarseInitializer::~CoarseInitializer()
 }
 
 
-bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, IOWrap::Output3DWrapper* wrap)
+bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IOWrap::Output3DWrapper*> &wraps)
 {
-	newFrame = newFrameHessian;
-	if(wrap != 0) wrap->pushLiveFrame(newFrameHessian);
+    newFrame = newFrameHessian;                            ///< firstFrame已在setFirst设置
+
+    for(IOWrap::Output3DWrapper* ow : wraps)
+        ow->pushLiveFrame(newFrameHessian);                ///< 画图用
+
 
 	int maxIterations[] = {5,5,10,30,50};
 
-	float alphaEnergyLog[PYR_LEVELS];
+
 
 	alphaK = 2.5*2.5;//*freeDebugParam1*freeDebugParam1;
 	alphaW = 150*150;//*freeDebugParam2*freeDebugParam2;
@@ -108,15 +111,18 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, IOWrap::Output
 	SE3 refToNew_current = thisToNext;
 	AffLight refToNew_aff_current = thisToNext_aff;
 
-	if(firstFrame->ab_exposure>0 && newFrame->ab_exposure>0)
+    if(firstFrame->ab_exposure>0 && newFrame->ab_exposure>0) {
+        /**
+         * refToNew_aff_current.a = ln(t_new / t_first) , refToNew_aff_current.b = 0
+         */
 		refToNew_aff_current = AffLight(logf(newFrame->ab_exposure /  firstFrame->ab_exposure),0); // coarse approximation.
-
+    }
 
 	Vec3f latestRes = Vec3f::Zero();
 	for(int lvl=pyrLevelsUsed-1; lvl>=0; lvl--)
 	{
 
-		alphaEnergyLog[lvl] = 0;
+
 
 		if(lvl<pyrLevelsUsed-1)
 			propagateDown(lvl+1);
@@ -203,7 +209,7 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, IOWrap::Output
 
 			if(accept)
 			{
-				alphaEnergyLog[lvl] = resNew[1] / (alphaK*numPoints[lvl]);
+
 				if(resNew[1] == alphaK*numPoints[lvl])
 					snapped = true;
 				H = H_new;
@@ -262,15 +268,21 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, IOWrap::Output
 
 
 
-	if(wrap !=0) debugPlot(0,wrap);
+    debugPlot(0,wraps);
 
 
 
 	return snapped && frameID > snappedAt+5;
 }
 
-void CoarseInitializer::debugPlot(int lvl, IOWrap::Output3DWrapper* wrap)
+void CoarseInitializer::debugPlot(int lvl, std::vector<IOWrap::Output3DWrapper*> &wraps)
 {
+    bool needCall = false;
+    for(IOWrap::Output3DWrapper* ow : wraps)
+        needCall = needCall || ow->needPushDepthImage();
+    if(!needCall) return;
+
+
 	int wl = w[lvl], hl = h[lvl];
 	Eigen::Vector3f* colorRef = firstFrame->dIp[lvl];
 
@@ -309,18 +321,10 @@ void CoarseInitializer::debugPlot(int lvl, IOWrap::Output3DWrapper* wrap)
 
 
 	//IOWrap::displayImage("idepth-R", &iRImg, false);
-	wrap->pushDepthImage(&iRImg);
+    for(IOWrap::Output3DWrapper* ow : wraps)
+        ow->pushDepthImage(&iRImg);
 }
 
-void CoarseInitializer::debugPlotFull()
-{
-
-}
-
-void CoarseInitializer::debugPlotFullHessians()
-{
-
-}
 // calculates residual, Hessian and Hessian-block neede for re-substituting depth.
 Vec3f CoarseInitializer::calcResAndGS(
 		int lvl, Mat88f &H_out, Vec8f &b_out,
@@ -334,6 +338,9 @@ Vec3f CoarseInitializer::calcResAndGS(
 
 	Mat33f RKi = (refToNew.rotationMatrix() * Ki[lvl]).cast<float>();
 	Vec3f t = refToNew.translation().cast<float>();
+    /**
+     * 一开始的时候r2new_aff[0] = t_new / t_first, r2new_aff[1] = 0，注意时间的比值存储的是对数
+     */
 	Eigen::Vector2f r2new_aff = Eigen::Vector2f(exp(refToNew_aff.a), refToNew_aff.b);
 
 	float fxl = fx[lvl];
@@ -357,8 +364,8 @@ Vec3f CoarseInitializer::calcResAndGS(
 		point->maxstep = 1e10;
 		if(!point->isGood)
 		{
-			E.updateSingle((float)(point->energy[0]));
-			point->energy_new = point->energy;
+            E.updateSingle((float)(point->energy[0]));  ///< energy初始化的时候为0, resetPoint后为0,applyStep后会更新
+            point->energy_new = point->energy;
 			point->isGood_new = false;
 			continue;
 		}
@@ -383,13 +390,17 @@ Vec3f CoarseInitializer::calcResAndGS(
 			int dx = patternP[idx][0];
 			int dy = patternP[idx][1];
 
-
+            /**
+             * d(u,v,1)^T = d'*R*Kinv(u',v',1)^T + t
+             * (Ku,Kv,1)^T = K(u,v,1)^T
+             * 这里变到尺度为1进行计算
+             */
 			Vec3f pt = RKi * Vec3f(point->u+dx, point->v+dy, 1) + t*point->idepth_new;
 			float u = pt[0] / pt[2];
 			float v = pt[1] / pt[2];
 			float Ku = fxl * u + cxl;
 			float Kv = fyl * v + cyl;
-			float new_idepth = point->idepth_new/pt[2];
+            float new_idepth = point->idepth_new/pt[2];
 
 			if(!(Ku > 1 && Kv > 1 && Ku < wl-2 && Kv < hl-2 && new_idepth > 0))
 			{
@@ -397,10 +408,8 @@ Vec3f CoarseInitializer::calcResAndGS(
 				break;
 			}
 
-			Vec3f hitColor = getInterpolatedElement33(colorNew, Ku, Kv, wl);
-			//Vec3f hitColor = getInterpolatedElement33BiCub(colorNew, Ku, Kv, wl);
+            Vec3f hitColor = getInterpolatedElement33(colorNew, Ku, Kv, wl); ///< 双线性插值
 
-			//float rlR = colorRef[point->u+dx + (point->v+dy) * wl][0];
 			float rlR = getInterpolatedElement31(colorRef, point->u+dx, point->v+dy, wl);
 
 			if(!std::isfinite(rlR) || !std::isfinite((float)hitColor[0]))
@@ -409,28 +418,60 @@ Vec3f CoarseInitializer::calcResAndGS(
 				break;
 			}
 
-
+            /** residual = I_new - (a * I_first + b)
+             *  a = \frac{t_new * exp(a_new)}{t_first * exp(a_first)}
+             *  b = b_new - b_first
+             *  注意，firstFrame上的点是不动的
+             */
 			float residual = hitColor[0] - r2new_aff[0] * rlR - r2new_aff[1];
 			float hw = fabs(residual) < setting_huberTH ? 1 : setting_huberTH / fabs(residual);
 			energy += hw *residual*residual*(2-hw);
 
+            /**
+             * u = x / d
+             * v = y / d
+             * new_idepth = id = 1/d = 1/pt[2]
+             * pt = R * Kinv(u', v', 1)^T + t * id'
+             */
 
+            /**
+             * u = x(id') / d(id')
+             * \frac{\partial u}{\partial id'} = \frac{x'd - d'x}{d^2}
+             *                                 = \frac{t[0] * d - t[2] * x}{d^2}
+             *                                 = \frac{t[0] - t[2] * u}{pt[2]}
+             */
+            float dxdd = (t[0]-t[2]*u)/pt[2];
 
-
-			float dxdd = (t[0]-t[2]*u)/pt[2];
+            /**
+             * v = y(id') / d(id')
+             * \frac{\partial v}{\partial id'} = \frac{y'd - d'y}{d^2}
+             *                                 = \frac{t[1] * d - t[2] * y}{d^2}
+             *                                 = \frac{t[1] - t[2] * v}{pt[2]}
+             */
 			float dydd = (t[1]-t[2]*v)/pt[2];
 
 			if(hw < 1) hw = sqrtf(hw);
 			float dxInterp = hw*hitColor[1]*fxl;
 			float dyInterp = hw*hitColor[2]*fyl;
-			dp0[idx] = new_idepth*dxInterp;
-			dp1[idx] = new_idepth*dyInterp;
-			dp2[idx] = -new_idepth*(u*dxInterp + v*dyInterp);
-			dp3[idx] = -u*v*dxInterp - (1+v*v)*dyInterp;
-			dp4[idx] = (1+u*u)*dxInterp + u*v*dyInterp;
-			dp5[idx] = -v*dxInterp + u*dyInterp;
+            /**
+             * dp0->5: \frac{\partial r}{\parital \xi_nr} = hw(\frac{\partial I_new}{\partial u}, \frac{\partial I_new}{\partial v}) *
+             *                                               \left ( \begin{array} fx/d & 0 & -xfx/d^2 \\ 0 & fy/d & -yfy/d^2 \end{array} \right ) *
+             *                                              (I, -((x,y,d)^T)^{\time})
+             * dp6: \frac{\partial r}{\parital a} = -hw * exp(a) * I_ref
+             * dp7: \frac{\partial r}{\parital b} = -hw
+             */
+            dp0[idx] = new_idepth*dxInterp;                   ///< dp0 = hw * \frac{\partial I_new}{\partial u} * fx / d
+            dp1[idx] = new_idepth*dyInterp;                   ///< dp1 = hw * \frac{\partial I_new}{\partial v} * fd / d
+            dp2[idx] = -new_idepth*(u*dxInterp + v*dyInterp); ///< dp2 = -hw * \frac{x*fx * \frac{\partial I_new}{\partial u} + y*fy * \frac{\partial I_new}{\partial v}}{d^2}
+            dp3[idx] = -u*v*dxInterp - (1+v*v)*dyInterp;      ///< dp3 = -hw(\frac{x}{d} * \frac{y}{d} * \frac{\partial I_new}{\partial u} * fx + (1 + \frac{y^2}{d^2}) * \frac{\partial I_new}{\partial v} * fy
+            dp4[idx] = (1+u*u)*dxInterp + u*v*dyInterp;       ///< dp4 = hw(1 + \frac{x^2}{d^2} * \frac{\partial I_new}{\partial u} * fx + \frac{x}{d} * \frac{y}{d} * \frac{\partial I_new}{\partial v} * fy)
+            dp5[idx] = -v*dxInterp + u*dyInterp;              ///< dp5 = -frac{y}{d} * \frac{\partial I_new}{\partial u} * fx + frac{x}{d} * \frac{\partial I_new}{\partial v} * fy
 			dp6[idx] = - hw*r2new_aff[0] * rlR;
 			dp7[idx] = - hw*1;
+
+            /**
+             * \frac{\partial r}{\partial id'} = grad(I_new) * (\frac{\partial u}{\partial id'}, \frac{\partial v}{\partial id'})^T
+             */
 			dd[idx] = dxInterp * dxdd  + dyInterp * dydd;
 			r[idx] = hw*residual;
 
@@ -489,11 +530,6 @@ Vec3f CoarseInitializer::calcResAndGS(
 
 	E.finish();
 	acc9.finish();
-
-
-
-
-
 
 	// calculate alpha energy, and decide if we cap it.
 	Accumulator11 EAlpha;
@@ -655,8 +691,8 @@ void CoarseInitializer::optReg(int lvl)
 
 		if(nnn > 2)
 		{
-			std::nth_element(idnn,idnn+nnn/2,idnn+nnn);
-			point->iR = (1-regWeight)*point->idepth + regWeight*idnn[nnn/2];
+            std::nth_element(idnn,idnn+nnn/2,idnn+nnn);                      ///<前n/2个元素小于第n/2个元素，后n/2个元素大于n/2个元素
+            point->iR = (1-regWeight)*point->idepth + regWeight*idnn[nnn/2]; ///< 用neighbours的中位数算加权平均
 		}
 	}
 
@@ -719,16 +755,19 @@ void CoarseInitializer::propagateDown(int srcLvl)
 		Pnt* point = ptst+i;
 		Pnt* parent = ptss+point->parent;
 
-		if(!parent->isGood || parent->lastHessian < 0.1) continue;
-		if(!point->isGood)
+        if(!parent->isGood || parent->lastHessian < 0.1) continue;        ///< makeNN已经设置好parent,good才传
+        if(!point->isGood)                                                ///< 点本身不行
 		{
 			point->iR = point->idepth = point->idepth_new = parent->iR;
 			point->isGood=true;
 			point->lastHessian=0;
 		}
-		else
+        else                                                             ///< 这个点不错
 		{
-			float newiR = (point->iR*point->lastHessian*2 + parent->iR*parent->lastHessian) / (point->lastHessian*2+parent->lastHessian);
+            /**
+             *  加权平均，当前点占2分，parent占1分
+             */
+            float newiR = (point->iR*point->lastHessian*2 + parent->iR*parent->lastHessian) / (point->lastHessian*2+parent->lastHessian);
 			point->iR = point->idepth = point->idepth_new = newiR;
 		}
 	}
@@ -764,7 +803,7 @@ void CoarseInitializer::setFirst(	CalibHessian* HCalib, FrameHessian* newFrameHe
 {
 
 	makeK(HCalib);
-	firstFrame = newFrameHessian;
+    firstFrame = newFrameHessian;       ///< 在这里初始化了firstFrame
 
 	PixelSelector sel(w[0],h[0]);
 
@@ -857,8 +896,7 @@ void CoarseInitializer::resetPoints(int lvl)
 		pts[i].energy.setZero();
 		pts[i].idepth_new = pts[i].idepth;
 
-
-		if(lvl==pyrLevelsUsed-1 && !pts[i].isGood)
+        if(lvl==pyrLevelsUsed-1 && !pts[i].isGood)         ///< 如果是最顶层,则算一下加权平均
 		{
 			float snd=0, sn=0;
 			for(int n = 0;n<10;n++)
@@ -961,22 +999,21 @@ void CoarseInitializer::makeK(CalibHessian* HCalib)
 void CoarseInitializer::makeNN()
 {
 	const float NNDistFactor=0.05;
-
 	typedef nanoflann::KDTreeSingleIndexAdaptor<
 			nanoflann::L2_Simple_Adaptor<float, FLANNPointcloud> ,
 			FLANNPointcloud,2> KDTree;
 
 	// build indices
-	FLANNPointcloud pcs[PYR_LEVELS];
+    FLANNPointcloud pcs[PYR_LEVELS];    ///< 需要对每层金字塔进行kd-tree
 	KDTree* indexes[PYR_LEVELS];
 	for(int i=0;i<pyrLevelsUsed;i++)
 	{
-		pcs[i] = FLANNPointcloud(numPoints[i], points[i]);
+        pcs[i] = FLANNPointcloud(numPoints[i], points[i]);       ///< 初始化每一层的distance type
 		indexes[i] = new KDTree(2, pcs[i], nanoflann::KDTreeSingleIndexAdaptorParams(5) );
-		indexes[i]->buildIndex();
+        indexes[i]->buildIndex();                                ///< 生成index
 	}
 
-	const int nn=10;
+    const int nn=10;                                   ///< 10个neighbours
 
 	// find NN & parents
 	for(int lvl=0;lvl<pyrLevelsUsed;lvl++)
@@ -986,8 +1023,8 @@ void CoarseInitializer::makeNN()
 
 		int ret_index[nn];
 		float ret_dist[nn];
-		nanoflann::KNNResultSet<float, int, int> resultSet(nn);
-		nanoflann::KNNResultSet<float, int, int> resultSet1(1);
+        nanoflann::KNNResultSet<float, int, int> resultSet(nn);     ///< k = 10
+        nanoflann::KNNResultSet<float, int, int> resultSet1(1);     ///< k = 1
 
 		for(int i=0;i<npts;i++)
 		{
@@ -999,15 +1036,15 @@ void CoarseInitializer::makeNN()
 			float sumDF = 0;
 			for(int k=0;k<nn;k++)
 			{
-				pts[i].neighbours[myidx]=ret_index[k];
-				float df = expf(-ret_dist[k]*NNDistFactor);
+                pts[i].neighbours[myidx]=ret_index[k];               ///< 注意，在这个部分吧当前点的neighbours存储了
+                float df = expf(-ret_dist[k]*NNDistFactor);          ///< neighbour距离公式
 				sumDF += df;
-				pts[i].neighboursDist[myidx]=df;
+                pts[i].neighboursDist[myidx]=df;                     ///< 存储了neighbour对应的距离
 				assert(ret_index[k]>=0 && ret_index[k] < npts);
 				myidx++;
 			}
 			for(int k=0;k<nn;k++)
-				pts[i].neighboursDist[k] *= 10/sumDF;
+                pts[i].neighboursDist[k] *= 10/sumDF;               ///< 把距离计算为比值
 
 
 			if(lvl < pyrLevelsUsed-1 )
@@ -1016,8 +1053,8 @@ void CoarseInitializer::makeNN()
 				pt = pt*0.5f-Vec2f(0.25f,0.25f);
 				indexes[lvl+1]->findNeighbors(resultSet1, (float*)&pt, nanoflann::SearchParams());
 
-				pts[i].parent = ret_index[0];
-				pts[i].parentDist = expf(-ret_dist[0]*NNDistFactor);
+                pts[i].parent = ret_index[0];                         ///< 找到上一层对应的点
+                pts[i].parentDist = expf(-ret_dist[0]*NNDistFactor);
 
 				assert(ret_index[0]>=0 && ret_index[0] < numPoints[lvl+1]);
 			}
@@ -1028,8 +1065,6 @@ void CoarseInitializer::makeNN()
 			}
 		}
 	}
-
-
 
 	// done.
 
