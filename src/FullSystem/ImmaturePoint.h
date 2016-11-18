@@ -56,13 +56,9 @@ class ImmaturePoint
 {
 public:
 	// static values
-	float color[MAX_RES_PER_POINT];
+    float color[MAX_RES_PER_POINT];              ///< 8源于模板？
 	float weights[MAX_RES_PER_POINT];
 	bool colorOverexposed[MAX_RES_PER_POINT];
-
-
-
-
 
 	Mat22f gradH;
 	Vec2f gradH_ev;
@@ -81,6 +77,14 @@ public:
 	ImmaturePoint(int u_, int v_, FrameHessian* host_, float type, CalibHessian* HCalib);
 	~ImmaturePoint();
 
+    /**
+     * @brief 更新host上的深度
+     * @param 客户帧
+     * @param hostToFrame_KRKi
+     * @param hostToFrame_Kt
+     * @param hostToFrame_affine
+     * @return 这个点trace的结果,如果是good，会更新深度
+     */
 	ImmaturePointStatus traceOn(FrameHessian* frame, Mat33f hostToFrame_KRKi, Vec3f hostToFrame_Kt, Vec2f hostToFrame_affine, CalibHessian* HCalib, bool debugPrint=false);
 
 	ImmaturePointStatus lastTraceStatus;

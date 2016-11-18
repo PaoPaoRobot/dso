@@ -44,10 +44,6 @@ class EFFrame;
 class EnergyFunctional;
 
 
-
-
-
-
 class EFResidual
 {
 public:
@@ -111,8 +107,6 @@ public:
 
 	PointHessian* data;
 
-
-
 	float priorF;
 	float deltaF;
 
@@ -134,7 +128,6 @@ public:
 	VecCf Hcd_accAF;
 	float bd_accAF;
 
-
 	EFPointStatus stateFlag;
 };
 
@@ -149,12 +142,9 @@ public:
 	}
 	void takeData();
 
-
 	Vec8 prior;				// prior hessian (diagonal)
 	Vec8 delta_prior;		// = state-state_prior (E_prior = (delta_prior)' * diag(prior) * (delta_prior)
 	Vec8 delta;				// state - state_zero.
-
-
 
 	std::vector<EFPoint*> points;
 	FrameHessian* data;

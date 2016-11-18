@@ -437,10 +437,10 @@ struct PointHessian
 	float maxRelBaseline;
 	int numGoodResiduals;
 
-	enum PtStatus {ACTIVE=0, INACTIVE, OUTLIER, OOB, MARGINALIZED};
+    enum PtStatus {ACTIVE=0, INACTIVE, OUTLIER, OOB /* OOB是什么? 孤立点？  */, MARGINALIZED};
 	PtStatus status;
 
-	inline void setPointStatus(PtStatus s) {status=s;};
+    inline void setPointStatus(PtStatus s) {status=s;}
 
 
 	inline void setIdepth(float idepth) {
@@ -454,8 +454,8 @@ struct PointHessian
 	inline void setIdepthZero(float idepth) {
 		idepth_zero = idepth;
 		idepth_zero_scaled = SCALE_IDEPTH * idepth;
-		nullspaces_scale = -(idepth*1.001 - idepth/1.001)*500;
-	};
+        nullspaces_scale = -(idepth*1.001 - idepth/1.001)*500;            ///<  这是啥？
+    }
 
 
 	std::vector<PointFrameResidual*> residuals;					// only contains good residuals (not OOB and not OUTLIER). Arbitrary order.
