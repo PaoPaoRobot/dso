@@ -31,15 +31,29 @@ namespace dso
 
 
 template<int i, int j>
+/**
+ * @brief block构建器
+ */
 class AccumulatorXX
 {
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
+  /**
+   * 一级缓存(小于1000)
+   */
   Eigen::Matrix<float,i,j> A;
+
+  /**
+   * @brief 二级缓存(1000-10000)
+   */
   Eigen::Matrix<float,i,j> A1k;
+
+  /**
+   * @brief 三级缓存(10000-inf)
+   */
   Eigen::Matrix<float,i,j> A1m;
-  size_t num;
+  size_t num;     ///< 约束个数
 
   inline void initialize()
   {
@@ -66,6 +80,10 @@ public:
 private:
   float numIn1, numIn1k, numIn1m;
 
+  /**
+   * @brief 像上级存储器转换
+   * @param force
+   */
   void shiftUp(bool force)
   {
 	  if(numIn1 > 1000 || force)

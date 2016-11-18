@@ -54,7 +54,7 @@ public:
 	float idepth_new;
 	Vec2f energy_new;
 
-	float iR;
+    float iR;           ///< 这个是做啥的?
 	float iRSumNum;
 
 	float lastHessian;

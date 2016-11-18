@@ -528,10 +528,11 @@ Vec3f CoarseInitializer::calcResAndGS(
 
 	}
 
-	E.finish();
-	acc9.finish();
+    E.finish();     ///< 计算出总的能量
+    acc9.finish();  ///< 构建完成线性方程组, 左边的8*8是Hessian，右边的8*1是b
 
-	// calculate alpha energy, and decide if we cap it.
+    // calculate alpha energy, and decide if we cap it
+    ///< what is alpha energy?
 	Accumulator11 EAlpha;
 	EAlpha.initialize();
 	for(int i=0;i<npts;i++)
@@ -611,10 +612,7 @@ Vec3f CoarseInitializer::calcResAndGS(
 	b_out[2] += tlog[2]*alphaOpt*npts;
 
 
-
-
-
-	return Vec3f(E.A, alphaEnergy ,E.num);
+    return Vec3f(E.A, alphaEnergy ,E.num); ///< 总误差，alpha误差，多少个点的误差
 }
 
 float CoarseInitializer::rescale()
