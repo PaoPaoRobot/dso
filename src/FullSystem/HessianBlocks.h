@@ -1,6 +1,6 @@
 /**
 * This file is part of DSO.
-* 
+*
 * Copyright 2016 Technical University of Munich and Intel.
 * Developed by Jakob Engel <engelj at in dot tum dot de>,
 * for more information see <http://vision.in.tum.de/dso>.
@@ -25,10 +25,10 @@
 #pragma once
 #define MAX_ACTIVE_FRAMES 100
 
- 
+
 #include "util/globalCalib.h"
 #include "vector"
- 
+
 #include <iostream>
 #include <fstream>
 #include "util/NumType.h"
@@ -40,9 +40,9 @@ namespace dso
 {
 
 
-inline Vec2 affFromTo(Vec2 from, Vec2 to)	// contains affine parameters as XtoWorld.
+inline Vec2 affFromTo ( Vec2 from, Vec2 to )	// contains affine parameters as XtoWorld.
 {
-	return Vec2(from[0] / to[0], (from[1] - to[1]) / to[0]);
+    return Vec2 ( from[0] / to[0], ( from[1] - to[1] ) / to[0] );
 }
 
 
@@ -74,431 +74,477 @@ class EFPoint;
 #define SCALE_B_INVERSE (1.0f / SCALE_B)
 
 
-struct FrameFramePrecalc
-{
-	// static values
-	static int instanceCounter;
-	FrameHessian* host;	// defines row
-	FrameHessian* target;	// defines column
+struct FrameFramePrecalc {
+    // static values
+    static int instanceCounter;
+    FrameHessian* host;	// defines row
+    FrameHessian* target;	// defines column
 
-	// precalc values
-	Mat33f PRE_RTll;
-	Mat33f PRE_KRKiTll;
-	Mat33f PRE_RKiTll;
-	Mat33f PRE_RTll_0;
+    // precalc values
+    Mat33f PRE_RTll;
+    Mat33f PRE_KRKiTll;
+    Mat33f PRE_RKiTll;
+    Mat33f PRE_RTll_0;
 
-	Vec2f PRE_aff_mode;
-	float PRE_b0_mode;
+    Vec2f PRE_aff_mode;
+    float PRE_b0_mode;
 
-	Vec3f PRE_tTll;
-	Vec3f PRE_KtTll;
-	Vec3f PRE_tTll_0;
+    Vec3f PRE_tTll;
+    Vec3f PRE_KtTll;
+    Vec3f PRE_tTll_0;
 
-	float distanceLL;
+    float distanceLL;
 
 
-	inline ~FrameFramePrecalc() {};
-	inline FrameFramePrecalc() {host=target=0;};
-	void set(FrameHessian* host, FrameHessian* target, CalibHessian* HCalib);
+    inline ~FrameFramePrecalc() {};
+    inline FrameFramePrecalc() {
+        host=target=0;
+    };
+    void set ( FrameHessian* host, FrameHessian* target, CalibHessian* HCalib );
 };
 
 
 
 
 
-struct FrameHessian
-{
-	EFFrame* efFrame;
+// 基本 frame 单元？
+struct FrameHessian {
+    EFFrame* efFrame;
 
-	// constant info & pre-calculated values
-	//DepthImageWrap* frame;
-	FrameShell* shell;
+    // constant info & pre-calculated values
+    // DepthImageWrap* frame;
+    FrameShell* shell;
 
-	Eigen::Vector3f* dI;				 // trace, fine tracking. Used for direction select (not for gradient histograms etc.)
+    Eigen::Vector3f* dI;				 // trace, fine tracking. Used for direction select (not for gradient histograms etc.)
     Eigen::Vector3f* dIp[PYR_LEVELS];	 // coarse tracking / coarse initializer. NAN in [0] only.　///< ０维度是亮度，１维度是u方向的梯度值，2维度是v方向的梯度值
     float* absSquaredGrad[PYR_LEVELS];  // only used for pixel select (histograms etc.). no NAN.　///< 梯度模的平方
-	bool* overexposedMap;
+    bool* overexposedMap;
     bool* overexposedMapp[PYR_LEVELS];  ///< 过曝光图，dso对每个像素点有一个过曝光的判别
 
 
 
 
-	int frameID;						// incremental ID for keyframes only!
-	static int instanceCounter;
-	int idx;
+    int frameID;						// incremental ID for keyframes only!
+    static int instanceCounter; // 引用计数？怎么不用shared_ptr
+    int idx; // 怎么又一个id，这是啥鸟东西 
 
-	// Photometric Calibration Stuff
-	float frameEnergyTH;	// set dynamically depending on tracking residual
-	float ab_exposure;
+    // Photometric Calibration Stuff
+    float frameEnergyTH;	// set dynamically depending on tracking residual
+    float ab_exposure;
 
-	bool flaggedForMarginalization;
+    bool flaggedForMarginalization;
 
-	std::vector<PointHessian*> pointHessians;				// contains all ACTIVE points.
-	std::vector<PointHessian*> pointHessiansMarginalized;	// contains all MARGINALIZED points (= fully marginalized, usually because point went OOB.)
-	std::vector<PointHessian*> pointHessiansOut;		// contains all OUTLIER points (= discarded.).
-	std::vector<ImmaturePoint*> immaturePoints;		// contains all OUTLIER points (= discarded.).
-	int statistics_pointsActivatedForThisFrame;
-	int tracesCreatedForThisFrame;
+    std::vector<PointHessian*> pointHessians;				// contains all ACTIVE points.
+    std::vector<PointHessian*> pointHessiansMarginalized;	// contains all MARGINALIZED points (= fully marginalized, usually because point went OOB.)
+    std::vector<PointHessian*> pointHessiansOut;		// contains all OUTLIER points (= discarded.).
+    std::vector<ImmaturePoint*> immaturePoints;		// contains all OUTLIER points (= discarded.).
+    int statistics_pointsActivatedForThisFrame;
+    int tracesCreatedForThisFrame;
 
-	Mat66 nullspaces_pose;
-	Mat42 nullspaces_affine;
-	Vec6 nullspaces_scale;
+    Mat66 nullspaces_pose;
+    Mat42 nullspaces_affine;
+    Vec6 nullspaces_scale;
 
-	// variable info.
-	SE3 worldToCam_evalPT;
-	Vec10 state_zero;
-	Vec10 state_scaled;
-	Vec10 state;	// [0-5: worldToCam-leftEps. 6-7: a,b]
-	Vec10 step;
-	Vec10 step_backup;
-	Vec10 state_backup;
-
-
-	EIGEN_STRONG_INLINE const SE3 &get_worldToCam_evalPT() const {return worldToCam_evalPT;};
-	EIGEN_STRONG_INLINE const Vec10 &get_state_zero() const {return state_zero;};
-	EIGEN_STRONG_INLINE const Vec10 &get_state() const {return state;};
-	EIGEN_STRONG_INLINE const Vec10 &get_state_scaled() const {return state_scaled;};
-	EIGEN_STRONG_INLINE const Vec10 get_state_minus_stateZero() const {return get_state() - get_state_zero();};
+    // variable info.
+    SE3 worldToCam_evalPT;
+    Vec10 state_zero;
+    Vec10 state_scaled;
+    Vec10 state;	// [0-5: worldToCam-leftEps. 6-7: a,b] 
+    Vec10 step;
+    Vec10 step_backup;
+    Vec10 state_backup;
 
 
-	// precalc values
-	SE3 PRE_worldToCam;
-	SE3 PRE_camToWorld;
-	std::vector<FrameFramePrecalc> targetPrecalc;
-	MinimalImageB3* debugImage;
+    EIGEN_STRONG_INLINE const SE3 &get_worldToCam_evalPT() const {
+        return worldToCam_evalPT;
+    };
+    EIGEN_STRONG_INLINE const Vec10 &get_state_zero() const {
+        return state_zero;
+    };
+    EIGEN_STRONG_INLINE const Vec10 &get_state() const {
+        return state;
+    };
+    EIGEN_STRONG_INLINE const Vec10 &get_state_scaled() const {
+        return state_scaled;
+    };
+    EIGEN_STRONG_INLINE const Vec10 get_state_minus_stateZero() const {
+        return get_state() - get_state_zero();
+    };
 
 
-	inline Vec6 w2c_leftEps() const {return get_state_scaled().head<6>();};
-	inline AffLight aff_g2l() const {return AffLight(get_state_scaled()[6], get_state_scaled()[7]);};
-	inline AffLight aff_g2l_0() const {return AffLight(get_state_zero()[6]*SCALE_A, get_state_zero()[7]*SCALE_B);};
+    // precalc values
+    SE3 PRE_worldToCam;
+    SE3 PRE_camToWorld;
+    std::vector<FrameFramePrecalc> targetPrecalc;
+    MinimalImageB3* debugImage;
 
 
-
-	void setStateZero(Vec10 state_zero);
-	inline void setState(Vec10 state)
-	{
-
-		this->state = state;
-		state_scaled.segment<3>(0) = SCALE_XI_TRANS * state.segment<3>(0);
-		state_scaled.segment<3>(3) = SCALE_XI_ROT * state.segment<3>(3);
-		state_scaled[6] = SCALE_A * state[6];
-		state_scaled[7] = SCALE_B * state[7];
-		state_scaled[8] = SCALE_A * state[8];
-		state_scaled[9] = SCALE_B * state[9];
-
-		PRE_worldToCam = SE3::exp(w2c_leftEps()) * get_worldToCam_evalPT();
-		PRE_camToWorld = PRE_worldToCam.inverse();
-		//setCurrentNullspace();
-	};
-	inline void setStateScaled(Vec10 state_scaled)
-	{
-
-		this->state_scaled = state_scaled;
-		state.segment<3>(0) = SCALE_XI_TRANS_INVERSE * state_scaled.segment<3>(0);
-		state.segment<3>(3) = SCALE_XI_ROT_INVERSE * state_scaled.segment<3>(3);
-		state[6] = SCALE_A_INVERSE * state_scaled[6];
-		state[7] = SCALE_B_INVERSE * state_scaled[7];
-		state[8] = SCALE_A_INVERSE * state_scaled[8];
-		state[9] = SCALE_B_INVERSE * state_scaled[9];
-
-		PRE_worldToCam = SE3::exp(w2c_leftEps()) * get_worldToCam_evalPT();
-		PRE_camToWorld = PRE_worldToCam.inverse();
-		//setCurrentNullspace();
-	};
-	inline void setEvalPT(SE3 worldToCam_evalPT, Vec10 state)
-	{
-
-		this->worldToCam_evalPT = worldToCam_evalPT;
-		setState(state);
-		setStateZero(state);
-	};
+    inline Vec6 w2c_leftEps() const {
+        return get_state_scaled().head<6>();
+    };
+    inline AffLight aff_g2l() const {
+        return AffLight ( get_state_scaled() [6], get_state_scaled() [7] );
+    };
+    inline AffLight aff_g2l_0() const {
+        return AffLight ( get_state_zero() [6]*SCALE_A, get_state_zero() [7]*SCALE_B );
+    };
 
 
 
-	inline void setEvalPT_scaled(SE3 worldToCam_evalPT, AffLight aff_g2l)
-	{
-		Vec10 initial_state = Vec10::Zero();
-		initial_state[6] = aff_g2l.a;
-		initial_state[7] = aff_g2l.b;
-		this->worldToCam_evalPT = worldToCam_evalPT;
-		setStateScaled(initial_state);
-		setStateZero(this->get_state());
-	};
+    void setStateZero ( Vec10 state_zero );
+    inline void setState ( Vec10 state ) {
 
-	void release();
+        this->state = state;
+        state_scaled.segment<3> ( 0 ) = SCALE_XI_TRANS * state.segment<3> ( 0 );
+        state_scaled.segment<3> ( 3 ) = SCALE_XI_ROT * state.segment<3> ( 3 );
+        state_scaled[6] = SCALE_A * state[6];
+        state_scaled[7] = SCALE_B * state[7];
+        state_scaled[8] = SCALE_A * state[8];
+        state_scaled[9] = SCALE_B * state[9];
 
-	inline ~FrameHessian()
-	{
-		assert(efFrame==0);
-		release(); instanceCounter--;
-		for(int i=0;i<pyrLevelsUsed;i++)
-		{
-			delete[] dIp[i];
-			delete[] overexposedMapp[i];
-			delete[]  absSquaredGrad[i];
+        PRE_worldToCam = SE3::exp ( w2c_leftEps() ) * get_worldToCam_evalPT();
+        PRE_camToWorld = PRE_worldToCam.inverse();
+        //setCurrentNullspace();
+    };
+    inline void setStateScaled ( Vec10 state_scaled ) {
 
-		}
+        this->state_scaled = state_scaled;
+        state.segment<3> ( 0 ) = SCALE_XI_TRANS_INVERSE * state_scaled.segment<3> ( 0 );
+        state.segment<3> ( 3 ) = SCALE_XI_ROT_INVERSE * state_scaled.segment<3> ( 3 );
+        state[6] = SCALE_A_INVERSE * state_scaled[6];
+        state[7] = SCALE_B_INVERSE * state_scaled[7];
+        state[8] = SCALE_A_INVERSE * state_scaled[8];
+        state[9] = SCALE_B_INVERSE * state_scaled[9];
 
+        PRE_worldToCam = SE3::exp ( w2c_leftEps() ) * get_worldToCam_evalPT();
+        PRE_camToWorld = PRE_worldToCam.inverse();
+        //setCurrentNullspace();
+    };
+    inline void setEvalPT ( SE3 worldToCam_evalPT, Vec10 state ) {
 
-
-		if(debugImage != 0) delete debugImage;
-	};
-	inline FrameHessian()
-	{
-		instanceCounter++;
-		flaggedForMarginalization=false;
-		frameID = -1;
-		efFrame = 0;
-		frameEnergyTH = 8*8*patternNum;
-
-
-
-		statistics_pointsActivatedForThisFrame=0;
-		tracesCreatedForThisFrame=0;
-		debugImage=0;
-	};
+        this->worldToCam_evalPT = worldToCam_evalPT;
+        setState ( state );
+        setStateZero ( state );
+    };
 
 
-	void makeImages(float* color, bool* overexposedMap, CalibHessian* HCalib);
 
-	inline Vec10 getPrior()
-	{
-		Vec10 p =  Vec10::Zero();
-		if(frameID==0)
-		{
-			p.head<3>() = Vec3::Constant(setting_initialTransPrior);
-			p.segment<3>(3) = Vec3::Constant(setting_initialRotPrior);
-			if(setting_solverMode & SOLVER_REMOVE_POSEPRIOR) p.head<6>().setZero();
+    inline void setEvalPT_scaled ( SE3 worldToCam_evalPT, AffLight aff_g2l ) {
+        Vec10 initial_state = Vec10::Zero();
+        initial_state[6] = aff_g2l.a;
+        initial_state[7] = aff_g2l.b;
+        this->worldToCam_evalPT = worldToCam_evalPT;
+        setStateScaled ( initial_state );
+        setStateZero ( this->get_state() );
+    };
 
-			p[6] = setting_initialAffAPrior;
-			p[7] = setting_initialAffBPrior;
-		}
-		else
-		{
-			if(setting_affineOptModeA < 0)
-				p[6] = setting_initialAffAPrior;
-			else
-				p[6] = setting_affineOptModeA;
+    void release();
 
-			if(setting_affineOptModeB < 0)
-				p[7] = setting_initialAffBPrior;
-			else
-				p[7] = setting_affineOptModeB;
-		}
-		p[8] = setting_initialAffAPrior;
-		p[9] = setting_initialAffBPrior;
-		return p;
-	}
+    inline ~FrameHessian() {
+        assert ( efFrame==0 );
+        release();
+        instanceCounter--;
+        for ( int i=0; i<pyrLevelsUsed; i++ ) {
+            delete[] dIp[i];
+            delete[] overexposedMapp[i];
+            delete[]  absSquaredGrad[i];
+
+        }
 
 
-	inline Vec10 getPriorZero()
-	{
-		return Vec10::Zero();
-	}
+
+        if ( debugImage != 0 ) {
+            delete debugImage;
+        }
+    };
+    inline FrameHessian() {
+        instanceCounter++;
+        flaggedForMarginalization=false;
+        frameID = -1;
+        efFrame = 0;
+        frameEnergyTH = 8*8*patternNum;
+
+
+
+        statistics_pointsActivatedForThisFrame=0;
+        tracesCreatedForThisFrame=0;
+        debugImage=0;
+    };
+
+
+    void makeImages ( float* color, bool* overexposedMap, CalibHessian* HCalib );
+
+    inline Vec10 getPrior() {
+        Vec10 p =  Vec10::Zero();
+        if ( frameID==0 ) {
+            p.head<3>() = Vec3::Constant ( setting_initialTransPrior );
+            p.segment<3> ( 3 ) = Vec3::Constant ( setting_initialRotPrior );
+            if ( setting_solverMode & SOLVER_REMOVE_POSEPRIOR ) {
+                p.head<6>().setZero();
+            }
+
+            p[6] = setting_initialAffAPrior;
+            p[7] = setting_initialAffBPrior;
+        } else {
+            if ( setting_affineOptModeA < 0 ) {
+                p[6] = setting_initialAffAPrior;
+            } else {
+                p[6] = setting_affineOptModeA;
+            }
+
+            if ( setting_affineOptModeB < 0 ) {
+                p[7] = setting_initialAffBPrior;
+            } else {
+                p[7] = setting_affineOptModeB;
+            }
+        }
+        p[8] = setting_initialAffAPrior;
+        p[9] = setting_initialAffBPrior;
+        return p;
+    }
+
+
+    inline Vec10 getPriorZero() {
+        return Vec10::Zero();
+    }
 
 };
 
-struct CalibHessian
-{
-	static int instanceCounter;
+struct CalibHessian {
+    static int instanceCounter;
 
-	VecC value_zero;
-	VecC value_scaled;
-	VecCf value_scaledf;
-	VecCf value_scaledi;
-	VecC value;
-	VecC step;
-	VecC step_backup;
-	VecC value_backup;
-	VecC value_minus_value_zero;
+    VecC value_zero;
+    VecC value_scaled;
+    VecCf value_scaledf;
+    VecCf value_scaledi;
+    VecC value;
+    VecC step;
+    VecC step_backup;
+    VecC value_backup;
+    VecC value_minus_value_zero;
 
-	inline ~CalibHessian() {instanceCounter--;};
-	inline CalibHessian()
-	{
+    inline ~CalibHessian() {
+        instanceCounter--;
+    };
+    inline CalibHessian() {
 
-		VecC initial_value = VecC::Zero();
-		initial_value[0] = fxG[0];
-		initial_value[1] = fyG[0];
-		initial_value[2] = cxG[0];
-		initial_value[3] = cyG[0];
+        VecC initial_value = VecC::Zero();
+        initial_value[0] = fxG[0];
+        initial_value[1] = fyG[0];
+        initial_value[2] = cxG[0];
+        initial_value[3] = cyG[0];
 
-		setValueScaled(initial_value);
-		value_zero = value;
-		value_minus_value_zero.setZero();
+        setValueScaled ( initial_value );
+        value_zero = value;
+        value_minus_value_zero.setZero();
 
-		instanceCounter++;
-		for(int i=0;i<256;i++)
-			Binv[i] = B[i] = i;		// set gamma function to identity
-	};
-
-
-	// normal mode: use the optimized parameters everywhere!
-    inline float& fxl() {return value_scaledf[0];}
-    inline float& fyl() {return value_scaledf[1];}
-    inline float& cxl() {return value_scaledf[2];}
-    inline float& cyl() {return value_scaledf[3];}
-    inline float& fxli() {return value_scaledi[0];}
-    inline float& fyli() {return value_scaledi[1];}
-    inline float& cxli() {return value_scaledi[2];}
-    inline float& cyli() {return value_scaledi[3];}
+        instanceCounter++;
+        for ( int i=0; i<256; i++ ) {
+            Binv[i] = B[i] = i;    // set gamma function to identity
+        }
+    };
 
 
-
-	inline void setValue(VecC value)
-	{
-		// [0-3: Kl, 4-7: Kr, 8-12: l2r]
-		this->value = value;
-		value_scaled[0] = SCALE_F * value[0];
-		value_scaled[1] = SCALE_F * value[1];
-		value_scaled[2] = SCALE_C * value[2];
-		value_scaled[3] = SCALE_C * value[3];
-
-		this->value_scaledf = this->value_scaled.cast<float>();
-		this->value_scaledi[0] = 1.0f / this->value_scaledf[0];
-		this->value_scaledi[1] = 1.0f / this->value_scaledf[1];
-		this->value_scaledi[2] = - this->value_scaledf[2] / this->value_scaledf[0];
-		this->value_scaledi[3] = - this->value_scaledf[3] / this->value_scaledf[1];
-		this->value_minus_value_zero = this->value - this->value_zero;
-	};
-
-	inline void setValueScaled(VecC value_scaled)
-	{
-		this->value_scaled = value_scaled;
-		this->value_scaledf = this->value_scaled.cast<float>();
-		value[0] = SCALE_F_INVERSE * value_scaled[0];
-		value[1] = SCALE_F_INVERSE * value_scaled[1];
-		value[2] = SCALE_C_INVERSE * value_scaled[2];
-		value[3] = SCALE_C_INVERSE * value_scaled[3];
-
-		this->value_minus_value_zero = this->value - this->value_zero;
-		this->value_scaledi[0] = 1.0f / this->value_scaledf[0];
-		this->value_scaledi[1] = 1.0f / this->value_scaledf[1];
-		this->value_scaledi[2] = - this->value_scaledf[2] / this->value_scaledf[0];
-		this->value_scaledi[3] = - this->value_scaledf[3] / this->value_scaledf[1];
-	};
+    // normal mode: use the optimized parameters everywhere!
+    inline float& fxl() {
+        return value_scaledf[0];
+    }
+    inline float& fyl() {
+        return value_scaledf[1];
+    }
+    inline float& cxl() {
+        return value_scaledf[2];
+    }
+    inline float& cyl() {
+        return value_scaledf[3];
+    }
+    inline float& fxli() {
+        return value_scaledi[0];
+    }
+    inline float& fyli() {
+        return value_scaledi[1];
+    }
+    inline float& cxli() {
+        return value_scaledi[2];
+    }
+    inline float& cyli() {
+        return value_scaledi[3];
+    }
 
 
-	float Binv[256];
-	float B[256];
+
+    inline void setValue ( VecC value ) {
+        // [0-3: Kl, 4-7: Kr, 8-12: l2r]
+        this->value = value;
+        value_scaled[0] = SCALE_F * value[0];
+        value_scaled[1] = SCALE_F * value[1];
+        value_scaled[2] = SCALE_C * value[2];
+        value_scaled[3] = SCALE_C * value[3];
+
+        this->value_scaledf = this->value_scaled.cast<float>();
+        this->value_scaledi[0] = 1.0f / this->value_scaledf[0];
+        this->value_scaledi[1] = 1.0f / this->value_scaledf[1];
+        this->value_scaledi[2] = - this->value_scaledf[2] / this->value_scaledf[0];
+        this->value_scaledi[3] = - this->value_scaledf[3] / this->value_scaledf[1];
+        this->value_minus_value_zero = this->value - this->value_zero;
+    };
+
+    inline void setValueScaled ( VecC value_scaled ) {
+        this->value_scaled = value_scaled;
+        this->value_scaledf = this->value_scaled.cast<float>();
+        value[0] = SCALE_F_INVERSE * value_scaled[0];
+        value[1] = SCALE_F_INVERSE * value_scaled[1];
+        value[2] = SCALE_C_INVERSE * value_scaled[2];
+        value[3] = SCALE_C_INVERSE * value_scaled[3];
+
+        this->value_minus_value_zero = this->value - this->value_zero;
+        this->value_scaledi[0] = 1.0f / this->value_scaledf[0];
+        this->value_scaledi[1] = 1.0f / this->value_scaledf[1];
+        this->value_scaledi[2] = - this->value_scaledf[2] / this->value_scaledf[0];
+        this->value_scaledi[3] = - this->value_scaledf[3] / this->value_scaledf[1];
+    };
 
 
-	EIGEN_STRONG_INLINE float getBGradOnly(float color)
-	{
-		int c = color+0.5f;
-		if(c<5) c=5;
-		if(c>250) c=250;
-		return B[c+1]-B[c];
-	}
-
-	EIGEN_STRONG_INLINE float getBInvGradOnly(float color)
-	{
-		int c = color+0.5f;
-		if(c<5) c=5;
-		if(c>250) c=250;
-		return Binv[c+1]-Binv[c];
-	}
+    float Binv[256];
+    float B[256];
 
 
-	Vec2f getAffLL(float host_exposure, float target_exposure, AffLight host_g2l, AffLight target_g2l);
+    EIGEN_STRONG_INLINE float getBGradOnly ( float color ) {
+        int c = color+0.5f;
+        if ( c<5 ) {
+            c=5;
+        }
+        if ( c>250 ) {
+            c=250;
+        }
+        return B[c+1]-B[c];
+    }
+
+    EIGEN_STRONG_INLINE float getBInvGradOnly ( float color ) {
+        int c = color+0.5f;
+        if ( c<5 ) {
+            c=5;
+        }
+        if ( c>250 ) {
+            c=250;
+        }
+        return Binv[c+1]-Binv[c];
+    }
+
+
+    Vec2f getAffLL ( float host_exposure, float target_exposure, AffLight host_g2l, AffLight target_g2l );
 };
 
 
 // hessian component associated with one point.
-struct PointHessian
-{
-	static int instanceCounter;
-	EFPoint* efPoint;
+struct PointHessian {
+    static int instanceCounter;
+    EFPoint* efPoint;
 
-	// static values
-	float color[MAX_RES_PER_POINT];			// colors in host frame
-	float weights[MAX_RES_PER_POINT];		// host-weights for respective residuals.
-	bool colorOverexposed[MAX_RES_PER_POINT];		// host-weights for respective residuals.
-
+    // static values
+    float color[MAX_RES_PER_POINT];			// colors in host frame
+    float weights[MAX_RES_PER_POINT];		// host-weights for respective residuals.
+    bool colorOverexposed[MAX_RES_PER_POINT];		// host-weights for respective residuals.
 
 
-	float u,v;
-	int idx;
-	float energyTH;
-	FrameHessian* host;
-	bool hasDepthPrior;
 
-	float my_type;
+    float u,v;
+    int idx;
+    float energyTH;
+    FrameHessian* host;
+    bool hasDepthPrior;
 
-	float idepth_scaled;
-	float idepth_zero_scaled;
-	float idepth_zero;
-	float idepth;
-	float step;
-	float step_backup;
-	float idepth_backup;
+    float my_type;
 
-	float nullspaces_scale;
-	float idepth_hessian;
-	float maxRelBaseline;
-	int numGoodResiduals;
+    float idepth_scaled;
+    float idepth_zero_scaled;
+    float idepth_zero;
+    float idepth;
+    float step;
+    float step_backup;
+    float idepth_backup;
+
+    float nullspaces_scale;
+    float idepth_hessian;
+    float maxRelBaseline;
+    int numGoodResiduals;
 
     enum PtStatus {ACTIVE=0, INACTIVE, OUTLIER, OOB /* OOB是什么? 孤立点？  */, MARGINALIZED};
-	PtStatus status;
+    PtStatus status;
 
-    inline void setPointStatus(PtStatus s) {status=s;}
-
-
-	inline void setIdepth(float idepth) {
-		this->idepth = idepth;
-		this->idepth_scaled = SCALE_IDEPTH * idepth;
-	};
-	inline void setIdepthScaled(float idepth_scaled) {
-		this->idepth = SCALE_IDEPTH_INVERSE * idepth_scaled;
-		this->idepth_scaled = idepth_scaled;
-	};
-	inline void setIdepthZero(float idepth) {
-		idepth_zero = idepth;
-		idepth_zero_scaled = SCALE_IDEPTH * idepth;
-        nullspaces_scale = -(idepth*1.001 - idepth/1.001)*500;            ///<  这是啥？
+    inline void setPointStatus ( PtStatus s ) {
+        status=s;
     }
 
 
-	std::vector<PointFrameResidual*> residuals;					// only contains good residuals (not OOB and not OUTLIER). Arbitrary order.
-	std::pair<PointFrameResidual*, ResState> lastResiduals[2]; 	// contains information about residuals to the last two (!) frames. ([0] = latest, [1] = the one before).
+    inline void setIdepth ( float idepth ) {
+        this->idepth = idepth;
+        this->idepth_scaled = SCALE_IDEPTH * idepth;
+    };
+    inline void setIdepthScaled ( float idepth_scaled ) {
+        this->idepth = SCALE_IDEPTH_INVERSE * idepth_scaled;
+        this->idepth_scaled = idepth_scaled;
+    };
+    inline void setIdepthZero ( float idepth ) {
+        idepth_zero = idepth;
+        idepth_zero_scaled = SCALE_IDEPTH * idepth;
+        nullspaces_scale = - ( idepth*1.001 - idepth/1.001 ) *500;        ///<  这是啥？
+    }
 
 
-	void release();
-	PointHessian(const ImmaturePoint* const rawPoint, CalibHessian* Hcalib);
-	inline ~PointHessian() {assert(efPoint==0); release(); instanceCounter--;};
+    std::vector<PointFrameResidual*> residuals;					// only contains good residuals (not OOB and not OUTLIER). Arbitrary order.
+    std::pair<PointFrameResidual*, ResState> lastResiduals[2]; 	// contains information about residuals to the last two (!) frames. ([0] = latest, [1] = the one before).
 
 
-	inline bool isOOB(const std::vector<FrameHessian*>& toKeep, const std::vector<FrameHessian*>& toMarg) const
-	{
-
-		int visInToMarg = 0;
-		for(PointFrameResidual* r : residuals)
-		{
-			if(r->state_state != ResState::IN) continue;
-			for(FrameHessian* k : toMarg)
-				if(r->target == k) visInToMarg++;
-		}
-		if((int)residuals.size() >= setting_minGoodActiveResForMarg &&
-				numGoodResiduals > setting_minGoodResForMarg+10 &&
-				(int)residuals.size()-visInToMarg < setting_minGoodActiveResForMarg)
-			return true;
+    void release();
+    PointHessian ( const ImmaturePoint* const rawPoint, CalibHessian* Hcalib );
+    inline ~PointHessian() {
+        assert ( efPoint==0 );
+        release();
+        instanceCounter--;
+    };
 
 
+    inline bool isOOB ( const std::vector<FrameHessian*>& toKeep, const std::vector<FrameHessian*>& toMarg ) const {
+
+        int visInToMarg = 0;
+        for ( PointFrameResidual* r : residuals ) {
+            if ( r->state_state != ResState::IN ) {
+                continue;
+            }
+            for ( FrameHessian* k : toMarg )
+                if ( r->target == k ) {
+                    visInToMarg++;
+                }
+        }
+        if ( ( int ) residuals.size() >= setting_minGoodActiveResForMarg &&
+                numGoodResiduals > setting_minGoodResForMarg+10 &&
+                ( int ) residuals.size()-visInToMarg < setting_minGoodActiveResForMarg ) {
+            return true;
+        }
 
 
 
-		if(lastResiduals[0].second == ResState::OOB) return true;
-		if(residuals.size() < 2) return false;
-		if(lastResiduals[0].second == ResState::OUTLIER && lastResiduals[1].second == ResState::OUTLIER) return true;
-		return false;
-	}
 
 
-	inline bool isInlierNew()
-	{
-		return (int)residuals.size() >= setting_minGoodActiveResForMarg
-					&& numGoodResiduals >= setting_minGoodResForMarg
-					&& maxRelBaseline >= setting_minRelBSForMarg;
-	}
+        if ( lastResiduals[0].second == ResState::OOB ) {
+            return true;
+        }
+        if ( residuals.size() < 2 ) {
+            return false;
+        }
+        if ( lastResiduals[0].second == ResState::OUTLIER && lastResiduals[1].second == ResState::OUTLIER ) {
+            return true;
+        }
+        return false;
+    }
+
+
+    inline bool isInlierNew() {
+        return ( int ) residuals.size() >= setting_minGoodActiveResForMarg
+               && numGoodResiduals >= setting_minGoodResForMarg
+               && maxRelBaseline >= setting_minRelBSForMarg;
+    }
 
 };
 

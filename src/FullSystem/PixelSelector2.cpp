@@ -165,6 +165,8 @@ void PixelSelector::makeHists(const FrameHessian* const fh)
 
 
 }
+
+
 int PixelSelector::makeMaps(
         const FrameHessian* const fh,
         float* map_out, float density, int recursionsLeft, bool plot, float thFactor)
@@ -199,7 +201,8 @@ int PixelSelector::makeMaps(
 
         if( recursionsLeft>0 && quotia > 1.25 && currentPotential>1)
         {
-            //re-sample to get more points!
+            // 点太少的意思
+            // re-sample to get more points!
             // potential needs to be smaller
             if(idealPotential>=currentPotential)
                 idealPotential = currentPotential-1;
@@ -209,6 +212,7 @@ int PixelSelector::makeMaps(
         }
         else if(recursionsLeft>0 && quotia < 0.25)
         {
+            // 点太多的意思 
             // re-sample to get less points!
 
             if(idealPotential<=currentPotential)
@@ -281,7 +285,7 @@ int PixelSelector::makeMaps(
 }
 
 
-
+// 
 Eigen::Vector3i PixelSelector::select(const FrameHessian* const fh,
                                       float* map_out, int pot, float thFactor)
 {
@@ -305,6 +309,7 @@ Eigen::Vector3i PixelSelector::select(const FrameHessian* const fh,
      * for i in xrange(-7, 9):
      *     print(cos(pi * i / 16), sin(pi * i / 16))
      */
+    // 总之是沿着圆周十六等分之后的东西 
     const Vec2f directions[16] = {
         Vec2f(0,    1.0000),
         Vec2f(0.3827,    0.9239),

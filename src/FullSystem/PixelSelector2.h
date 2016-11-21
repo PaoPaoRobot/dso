@@ -1,6 +1,6 @@
 /**
 * This file is part of DSO.
-* 
+*
 * Copyright 2016 Technical University of Munich and Intel.
 * Developed by Jakob Engel <engelj at in dot tum dot de>,
 * for more information see <http://vision.in.tum.de/dso>.
@@ -23,7 +23,7 @@
 
 
 #pragma once
- 
+
 #include "util/NumType.h"
 
 namespace dso
@@ -34,39 +34,41 @@ enum PixelSelectorStatus {PIXSEL_VOID=0, PIXSEL_1, PIXSEL_2, PIXSEL_3};
 
 class FrameHessian;
 
+// 神奇的像素选择器
 class PixelSelector
 {
 public:
-	int makeMaps(
-			const FrameHessian* const fh,
-			float* map_out, float density, int recursionsLeft=1, bool plot=false, float thFactor=1);
+    // input: 
+    // fh-帧
+    // map_out-点标记
+    // density-需要的点数量
+    int makeMaps (
+        const FrameHessian* const fh,
+        float* map_out, float density, int recursionsLeft=1, bool plot=false, float thFactor=1 );
 
-	PixelSelector(int w, int h);
-	~PixelSelector();
-	int currentPotential;
+    PixelSelector ( int w, int h );
+    ~PixelSelector();
+    int currentPotential;
 
 
-	bool allowFast;
+    bool allowFast;
 
     /**
      * @brief 生成图像直方图特征
      * @param frame
      */
-	void makeHists(const FrameHessian* const fh);
+    void makeHists ( const FrameHessian* const fh );
+    
 private:
+    Eigen::Vector3i select ( const FrameHessian* const fh,
+                             float* map_out, int pot, float thFactor=1 );
 
-	Eigen::Vector3i select(const FrameHessian* const fh,
-			float* map_out, int pot, float thFactor=1);
-
-
-	unsigned char* randomPattern;
-
-
-	int* gradHist;
-	float* ths;
-	float* thsSmoothed;
-	int thsStep;
-	const FrameHessian* gradHistFrame;
+    unsigned char* randomPattern;
+    int* gradHist;
+    float* ths;
+    float* thsSmoothed;
+    int thsStep;
+    const FrameHessian* gradHistFrame;
 };
 
 
