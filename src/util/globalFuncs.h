@@ -87,7 +87,7 @@ EIGEN_ALWAYS_INLINE Eigen::Vector3f getInterpolatedElement33(const Eigen::Vector
 	        + (dx-dxdy) * *(const Eigen::Vector3f*)(bp+1)
 			+ (1-dx-dy+dxdy) * *(const Eigen::Vector3f*)(bp);
 }
-
+// overMat是过曝图
 EIGEN_ALWAYS_INLINE Eigen::Vector3f getInterpolatedElement33OverAnd(const Eigen::Vector3f* const mat, const bool* overMat, const float x, const float y, const int width, bool& over_out)
 {
 	int ix = (int)x;
@@ -122,7 +122,7 @@ EIGEN_ALWAYS_INLINE Eigen::Vector3f getInterpolatedElement33OverOr(const Eigen::
 	        + (dx-dxdy) * *(const Eigen::Vector3f*)(bp+1)
 			+ (1-dx-dy+dxdy) * *(const Eigen::Vector3f*)(bp);
 }
-
+// 双线性插值，只返回Vector3f中第一个元素
 EIGEN_ALWAYS_INLINE float getInterpolatedElement31(const Eigen::Vector3f* const mat, const float x, const float y, const int width)
 {
 	int ix = (int)x;

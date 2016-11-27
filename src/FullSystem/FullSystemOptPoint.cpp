@@ -53,6 +53,7 @@ PointHessian* FullSystem::optimizeImmaturePoint(
 		ImmaturePointTemporaryResidual* residuals)
 {
 	int nres = 0;
+  // 初始化这个点在其他帧的残差
 	for(FrameHessian* fh : frameHessians)
 	{
 		if(fh != point->host)
@@ -74,14 +75,18 @@ PointHessian* FullSystem::optimizeImmaturePoint(
 	float currentIdepth=(point->idepth_max+point->idepth_min)*0.5f;
 
 	float searchStep=1;
+  // setting_discreteSeachItsOnPointActivation = 0 ??
+  // 尽量优化得到更准确的逆深度
 	for(int k=0;k<setting_discreteSeachItsOnPointActivation;k++)
 	{
 		// start of with a discrete search around the initialization.
 		float minE=1e10;
-		float minEid = currentIdepth;
+		float minEid = currentIdepth;// 最小E所对应的逆深度
 		float discreteStep=1000;
 		for(int i=0;i<nres;i++)
 		{
+      // getdPixdd 好像是得到像素重投影到target帧图像平面上的偏移的距离 ？ Puzzle
+      // 为什么取倒数？
 			float idPerPix = 1.0f / point->getdPixdd(&Hcalib, residuals+i, currentIdepth);
 			if(idPerPix < discreteStep) discreteStep = idPerPix;
 		}
@@ -105,13 +110,13 @@ PointHessian* FullSystem::optimizeImmaturePoint(
 
 		if(k==0 && fabsf(currentIdepth-minEid) > 4*searchStep)
 			return (PointHessian*)((long)(-1));
-		currentIdepth = minEid;
+		currentIdepth = minEid; // 优化后的逆深度
 	}
 
 
 
 
-
+  // 计算残差能量，更新残差状态
 	for(int i=0;i<nres;i++)
 	{
 		lastEnergy += point->linearizeResidual(&Hcalib, 1000, residuals+i,lastHdd, lastbd, currentIdepth);
@@ -131,6 +136,7 @@ PointHessian* FullSystem::optimizeImmaturePoint(
 			nres, lastHdd,lastEnergy,currentIdepth);
 
 	float lambda = 0.1;
+  // setting_GNItsOnPointActivation = 3;
 	for(int iteration=0;iteration<setting_GNItsOnPointActivation;iteration++)
 	{
 		float H = lastHdd;

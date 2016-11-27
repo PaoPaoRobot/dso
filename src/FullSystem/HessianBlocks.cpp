@@ -152,7 +152,7 @@ void FrameHessian::makeImages ( float* color, bool* everexpMap, CalibHessian* HC
         absSquaredGrad[i] = new float[wG[i]*hG[i]];
         overexposedMapp[i] = new bool[wG[i]*hG[i]];
     }
-    dI = dIp[0];
+    dI = dIp[0]; // 第0层，所以dI没有另外分配空间
     overexposedMap = overexposedMapp[0];
 
     if ( everexpMap==0 )
@@ -255,28 +255,29 @@ void FrameHessian::makeImages ( float* color, bool* everexpMap, CalibHessian* HC
                 /**
                  * @brief 曝光矫正过后的梯度
                  */
-                float gw = HCalib->getBGradOnly ( ( float ) ( dI_l[idx][0] ) );
+                float gw = HCalib->getBGradOnly ( ( float ) ( dI_l[idx][0] ) ); // 辐照度B的梯度
                 dabs_l[idx] *= gw*gw;	// convert to gradient of original color space (before removing response).
             }
         }
     }
 }
-
+// 计算 host 到target的 点坐标变换矩阵，和 AffLight
 void FrameFramePrecalc::set ( FrameHessian* host, FrameHessian* target, CalibHessian* HCalib )
 {
     this->host = host;
     this->target = target;
 
+    // 从host到target 点坐标变换矩阵的更新
     SE3 leftToLeft_0 = target->get_worldToCam_evalPT() * host->get_worldToCam_evalPT().inverse();
     PRE_RTll_0 = ( leftToLeft_0.rotationMatrix() ).cast<float>();
     PRE_tTll_0 = ( leftToLeft_0.translation() ).cast<float>();
 
 
-
+    // Puzzle , leftToLeft 和 leftToLeft_0 一样？？?
     SE3 leftToLeft = target->PRE_worldToCam * host->PRE_camToWorld;
     PRE_RTll = ( leftToLeft.rotationMatrix() ).cast<float>();
     PRE_tTll = ( leftToLeft.translation() ).cast<float>();
-    distanceLL = leftToLeft.translation().norm();
+    distanceLL = leftToLeft.translation().norm(); // 两帧之间的平移距离
 
 
     Mat33f K = Mat33f::Zero();

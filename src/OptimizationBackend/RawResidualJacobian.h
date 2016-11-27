@@ -32,22 +32,24 @@ namespace dso
 struct RawResidualJacobian
 {
 	// ================== new structure: save independently =============.
-	EIGEN_ALIGN16 VecNRf resF;
+	EIGEN_ALIGN16 VecNRf resF; // 8个残差
 
 	// the two rows of d[x,y]/d[xi].
+  // xi是R,T
 	EIGEN_ALIGN16 Vec6f Jpdxi[2];			// 2x6
 
 	// the two rows of d[x,y]/d[C].
+  // c是相机内参
 	EIGEN_ALIGN16 VecCf Jpdc[2];			// 2x4
 
 	// the two rows of d[x,y]/d[idepth].
 	EIGEN_ALIGN16 Vec2f Jpdd;				// 2x1
 
 	// the two columns of d[r]/d[x,y].
-	EIGEN_ALIGN16 VecNRf JIdx[2];			// 9x2
+	EIGEN_ALIGN16 VecNRf JIdx[2];			// 9x2 ，应该是8*2，每个点和它邻域有8个残差
 
 	// = the two columns of d[r] / d[ab]
-	EIGEN_ALIGN16 VecNRf JabF[2];			// 9x2
+	EIGEN_ALIGN16 VecNRf JabF[2];			// 9x2 ，8*2，对光度参数a,b求导
 
 
 	// = JIdx^T * JIdx (inner product). Only as a shorthand.

@@ -55,8 +55,11 @@ namespace dso
 
 
 
-void FullSystem::flagFramesForMarginalization(FrameHessian* newFH)
+void FullSystem::flagFramesForMarginalization(FrameHessian* newFH) // 参数newFH没有用到。。
 {
+  // setting_minFrameAge =1, setting_maxFrames = 7
+  // setting_minFrameAge是离最新帧在age里面都不会marg，而setting_maxFrames表示FrameHessian最多有这么多帧不marg
+  // 所以这种情况下，直接把frameHessians中前 size-setting_maxFrames 帧都标记为 marg
 	if(setting_minFrameAge > setting_maxFrames)
 	{
 		for(int i=setting_maxFrames;i<(int)frameHessians.size();i++)
@@ -70,7 +73,7 @@ void FullSystem::flagFramesForMarginalization(FrameHessian* newFH)
 
 	int flagged = 0;
 	// marginalize all frames that have not enough points.
-	for(int i=0;i<(int)frameHessians.size();i++)
+	for(int i=0;i<(int)frameHessians.size();i++) // 没有足够点的帧，标记为要marg
 	{
 		FrameHessian* fh = frameHessians[i];
 		int in = fh->pointHessians.size() + fh->immaturePoints.size();
@@ -105,7 +108,7 @@ void FullSystem::flagFramesForMarginalization(FrameHessian* newFH)
 	}
 
 	// marginalize one.
-	if((int)frameHessians.size()-flagged >= setting_maxFrames)
+	if((int)frameHessians.size()-flagged >= setting_maxFrames) // 要保留的帧太多，还要再marg一些；setting_maxFrames = 7，只保留7帧？？
 	{
 		double smallestScore = 1;
 		FrameHessian* toMarginalize=0;
@@ -114,19 +117,20 @@ void FullSystem::flagFramesForMarginalization(FrameHessian* newFH)
 
 		for(FrameHessian* fh : frameHessians)
 		{
+      // 跳过很新的帧和最开始的第一帧
 			if(fh->frameID > latest->frameID-setting_minFrameAge || fh->frameID == 0) continue;
 			//if(fh==frameHessians.front() == 0) continue;
 
 			double distScore = 0;
-			for(FrameFramePrecalc &ffh : fh->targetPrecalc)
+			for(FrameFramePrecalc &ffh : fh->targetPrecalc) // std::vector<FrameFramePrecalc> targetPrecalc;
 			{
 				if(ffh.target->frameID > latest->frameID-setting_minFrameAge+1 || ffh.target == ffh.host) continue;
-				distScore += 1/(1e-5+ffh.distanceLL);
+				distScore += 1/(1e-5+ffh.distanceLL); /// ffh.distanceLL 是 host和target帧之间的平移距离
 
 			}
-			distScore *= -sqrtf(fh->targetPrecalc.back().distanceLL);
+			distScore *= -sqrtf(fh->targetPrecalc.back().distanceLL); // Puzzle, ？？
 
-
+      // 上面乘以了负号，所以实际是距离它的target都很近的host作为要marg的
 			if(distScore < smallestScore)
 			{
 				smallestScore = distScore;

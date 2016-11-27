@@ -64,7 +64,7 @@ public:
 	Vec2f gradH_ev;
 	Mat22f gradH_eig;
 	float energyTH;
-	float u,v;
+	float u,v; // Puzzle, 为什么是float类型？
 	FrameHessian* host;
 	int idxInImmaturePoints;
 

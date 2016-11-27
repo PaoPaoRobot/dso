@@ -100,6 +100,7 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame, Mat33f hostToFra
 //	const float minImprovementFactor = 2;		// if pixel-interval is smaller than this, leave it be.
 	// ============== project min and max. return if one of them is OOB ===================
 	Vec3f pr = hostToFrame_KRKi * Vec3f(u,v, 1);
+  // Puzzle 为什么用 idepth_min
     Vec3f ptpMin = pr + hostToFrame_Kt*idepth_min;           ///< 以尺度为１计算了投影之后的d*P
     float uMin = ptpMin[0] / ptpMin[2];                      ///< 投影后的u
     float vMin = ptpMin[1] / ptpMin[2];                      ///< 投影后的v
@@ -134,8 +135,8 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame, Mat33f hostToFra
 
 		// ============== check their distance. everything below 2px is OK (-> skip). ===================
 		dist = (uMin-uMax)*(uMin-uMax) + (vMin-vMax)*(vMin-vMax);
-		dist = sqrtf(dist);
-        if(dist < setting_trace_slackInterval)                           ///< 检测搜索距离大小
+		dist = sqrtf(dist); // dist也在下面用来确定搜索步长
+        if(dist < setting_trace_slackInterval)  // 1.5                         ///< 检测搜索距离大小
 		{
 			if(debugPrint)
 				printf("TOO CERTAIN ALREADY (dist %f)!\n", dist);
@@ -187,11 +188,12 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame, Mat33f hostToFra
 
 
 	// ============== compute error-bounds on result in pixel. if the new interval is not at least 1/2 of the old, SKIP ===================
-    float dx = setting_trace_stepsize*(uMax-uMin);                     ///< 确定搜索长度
+    float dx = setting_trace_stepsize*(uMax-uMin);                     ///< 确定搜索长度和搜索方向
 	float dy = setting_trace_stepsize*(vMax-vMin);
 
     float a = (Vec2f(dx,dy).transpose() * gradH * Vec2f(dx,dy));     ///< a = (dx, dy) * (IxIxdx + IyIxdy, IxIydx + IyIydy)^T = dxIxIxdx + 2dxIxIydy + dyIyIydy
     float b = (Vec2f(dy,-dx).transpose() * gradH * Vec2f(dy,-dx));   ///< b = (dy, -dx) * (IxIxdy - IyIxdx, IyIxdy - IyIydx)^T = dyIxIxdy - 2dyIyIxdx + dxIyIydx
+    // Puzzle ? ??, (dx,dy)和(dy, -dx)相互垂直
     float errorInPixel = 0.2f + 0.2f * (a+b) / a;                    ///< a+b = Ix^2(dx^2 + dy^2) + Iy^2(dx^2 + dy^2) = (|gradI|ds)^2, a = (grad I) * (dx, dy)^T
                                                                      ///< (a+b) / a = (1/cos(theta))^2  几何意义是什么？
 
@@ -229,7 +231,9 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame, Mat33f hostToFra
 		dist = maxPixSearch;
 	}
 
+    //  setting_trace_stepsize = 1.0
     int numSteps = 1.9999f + dist / setting_trace_stepsize;   ///< 得到搜索步数
+    // 应该有逆深度之比才对？？Puzzle, 假设逆深度一样？同一个点在不同camera下的逆深度不一样
     Mat22f Rplane = hostToFrame_KRKi.topLeftCorner<2,2>();    ///< 这样可以得到平面的旋转？
 
 	float randShift = uMin*1000-floorf(uMin*1000);
@@ -258,12 +262,14 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame, Mat33f hostToFra
 	int bestIdx=-1;
 	if(numSteps >= 100) numSteps = 99;
 
+  // 从 idepth_min 遍历到 idepth_max, 找到残差能量最小的，所对应的新的帧中的u,v
 	for(int i=0;i<numSteps;i++)
 	{
 		float energy=0;
+    // 统计模板上的点在两帧中残差energy
         for(int idx=0;idx<patternNum;idx++)                          ///< 按照模板找匹配
 		{
-			float hitColor = getInterpolatedElement31(frame->dI,
+			float hitColor = getInterpolatedElement31(frame->dI,  // frame->dI就是图像灰度值
 										(float)(ptx+rotatetPattern[idx][0]),
 										(float)(pty+rotatetPattern[idx][1]),
 										wG[0]);
@@ -294,11 +300,14 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame, Mat33f hostToFra
 	float secondBest=1e10;
 	for(int i=0;i<numSteps;i++)
 	{
+    // setting_minTraceTestRadius = 2; 找到第二好的点，避开最好点周围
 		if((i < bestIdx-setting_minTraceTestRadius || i > bestIdx+setting_minTraceTestRadius) && errors[i] < secondBest)
 			secondBest = errors[i];
     }
+    // 看第二好的点和最好点差多少
+    // energy是越小越好，所以 secondBest > bestEnergy, 所以 newQuality越大说明匹配越好
     float newQuality = secondBest / bestEnergy;                          ///< 让我们来看看这个质量有多好，周围的点(bestIdx-setting_minTraceTestRadius, bestIdx+setting_minTraceTestRadius)的误差加一加，除以最好的误差
-	if(newQuality < quality || numSteps > 10) quality = newQuality;
+	if(newQuality < quality || numSteps > 10) quality = newQuality; // 取这个点最差的质量
 
 
 	// ============== do GN optimization ===================
@@ -306,21 +315,23 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame, Mat33f hostToFra
 	float uBak=bestU, vBak=bestV, gnstepsize=1, stepBack=0;
 	if(setting_trace_GNIterations>0) bestEnergy = 1e5;
 	int gnStepsGood=0, gnStepsBad=0;
+  // setting_trace_GNIterations = 3
 	for(int it=0;it<setting_trace_GNIterations;it++)
 	{
 		float H = 1, b=0, energy=0;
 		for(int idx=0;idx<patternNum;idx++)
 		{
+      // 上面是 getInterpolatedElement31
 			Vec3f hitColor = getInterpolatedElement33(frame->dI,
 					(float)(bestU+rotatetPattern[idx][0]),
 					(float)(bestV+rotatetPattern[idx][1]),wG[0]);
 
 			if(!std::isfinite((float)hitColor[0])) {energy+=1e5; continue;}
 			float residual = hitColor[0] - (hostToFrame_affine[0] * color[idx] + hostToFrame_affine[1]);
-			float dResdDist = dx*hitColor[1] + dy*hitColor[2];
+			float dResdDist = dx*hitColor[1] + dy*hitColor[2];  // 不用开方？Puzzle
 			float hw = fabs(residual) < setting_huberTH ? 1 : setting_huberTH / fabs(residual);
 
-			H += hw*dResdDist*dResdDist;
+			H += hw*dResdDist*dResdDist; // Puzzle?
 			b += hw*residual*dResdDist;
 			energy += weights[idx]*weights[idx]*hw *residual*residual*(2-hw);
 		}
@@ -363,6 +374,7 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame, Mat33f hostToFra
 						uBak, vBak, bestU, bestV);
 		}
 
+    // setting_trace_GNThreshold = 0.1
 		if(fabsf(stepBack) < setting_trace_GNThreshold) break;
 	}
 
@@ -391,6 +403,7 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame, Mat33f hostToFra
 	// ============== set new interval ===================
     if(dx*dx>dy*dy)     ///<　为了鲁棒，用长一点的传？
 	{
+    // 公式不对？ Puzzle
         idepth_min = (pr[2]*(bestU-errorInPixel*dx) - pr[0]) / (hostToFrame_Kt[0] - hostToFrame_Kt[2]*(bestU-errorInPixel*dx));    ///< 是时候吧更新的深度传一下了
 		idepth_max = (pr[2]*(bestU+errorInPixel*dx) - pr[0]) / (hostToFrame_Kt[0] - hostToFrame_Kt[2]*(bestU+errorInPixel*dx));
 	}

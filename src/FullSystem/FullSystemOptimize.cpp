@@ -68,8 +68,9 @@ void FullSystem::linearizeAll_Reductor(bool fixLinearization, std::vector<PointF
 				if(r->isNew)
 				{
 					PointHessian* p = r->point;
-					Vec3f ptp_inf = r->host->targetPrecalc[r->target->idx].PRE_KRKiTll * Vec3f(p->u,p->v, 1);	// projected point assuming infinite depth.
+					Vec3f ptp_inf = r->host->targetPrecalc[r->target->idx].PRE_KRKiTll * Vec3f(p->u,p->v, 1);	// projected point assuming infinite depth. 无穷大的深度就是忽略了平移项
 					Vec3f ptp = ptp_inf + r->host->targetPrecalc[r->target->idx].PRE_KtTll*p->idepth_scaled;	// projected point with real depth.
+          // 相对 基线？
 					float relBS = 0.01*((ptp_inf.head<2>() / ptp_inf[2])-(ptp.head<2>() / ptp[2])).norm();	// 0.01 = one pixel.
 
 
@@ -93,7 +94,7 @@ void FullSystem::applyRes_Reductor(bool copyJacobians, int min, int max, Vec10* 
 	for(int k=min;k<max;k++)
 		activeResiduals[k]->applyRes(true);
 }
-void FullSystem::setNewFrameEnergyTH()
+void FullSystem::setNewFrameEnergyTH() // 设置新的帧能量阈值
 {
 
 	// collect all residuals and make decision on TH.
@@ -105,7 +106,7 @@ void FullSystem::setNewFrameEnergyTH()
 		if(r->state_NewEnergyWithOutlier >= 0 && r->target == newFrame)
 		{
 			allResVec.push_back(r->state_NewEnergyWithOutlier);
-			sumR += r->state_NewEnergyWithOutlier;
+			sumR += r->state_NewEnergyWithOutlier; // 为什么带Outlier? Puzzle
 		}
 
 	if(allResVec.size()==0)
@@ -115,7 +116,7 @@ void FullSystem::setNewFrameEnergyTH()
 	}
 
 
-	int nthIdx = setting_frameEnergyTHN*allResVec.size();
+	int nthIdx = setting_frameEnergyTHN*allResVec.size(); // setting_frameEnergyTHN = 0.7
 
 	assert(nthIdx < (int)allResVec.size());
 	assert(setting_frameEnergyTHN < 1);
@@ -128,7 +129,7 @@ void FullSystem::setNewFrameEnergyTH()
 
 
 
-
+  // Puzzle..
 	newFrame->frameEnergyTH = nthElement*setting_frameEnergyTHFacMedian + meanElement*setting_frameEnergyTHFacMean;
 	newFrame->frameEnergyTH = 26.0f*setting_frameEnergyTHConstWeight + newFrame->frameEnergyTH*(1-setting_frameEnergyTHConstWeight);
 	newFrame->frameEnergyTH = newFrame->frameEnergyTH*newFrame->frameEnergyTH;
@@ -412,7 +413,7 @@ void FullSystem::printOptRes(Vec3 res, double resL, double resM, double resPrior
 }
 
 
-float FullSystem::optimize(int mnumOptIts)
+float FullSystem::optimize(int mnumOptIts) // mnumOptIts = 6
 {
 
 	if(frameHessians.size() < 2) return 0;

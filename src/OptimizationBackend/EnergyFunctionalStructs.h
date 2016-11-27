@@ -92,7 +92,7 @@ public:
 	inline const bool &isActive() const {return isActiveAndIsGoodNEW;}
 };
 
-
+// PS: Point Status
 enum EFPointStatus {PS_GOOD=0, PS_MARGINALIZE, PS_DROP};
 
 class EFPoint
@@ -107,7 +107,7 @@ public:
 
 	PointHessian* data;
 
-	float priorF;
+	float priorF; // 后缀F好像只是表示是float...
 	float deltaF;
 
 
@@ -132,7 +132,7 @@ public:
 };
 
 
-
+// Energy Function对应的Frame:  FrameHessian* data;
 class EFFrame
 {
 public:

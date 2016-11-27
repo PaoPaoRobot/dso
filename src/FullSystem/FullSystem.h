@@ -60,12 +60,14 @@ class CoarseDistanceMap;
 
 class EnergyFunctional;
 
+// 释放一个指针，从结尾弹出一个指针
 template<typename T> inline void deleteOut ( std::vector<T*> &v, const int i )
 {
     delete v[i];
     v[i] = v.back();
     v.pop_back();
 }
+// 弹出vector中的某个指针
 template<typename T> inline void deleteOutPt ( std::vector<T*> &v, const T* i )
 {
     delete i;
@@ -134,9 +136,11 @@ public:
     virtual ~FullSystem();
 
     // adds a new frame, and creates point & residual structs.
+    // 增加新帧，创建点和残差结构
     void addActiveFrame ( ImageAndExposure* image, int id );
 
     // marginalizes a frame. drops / marginalizes points & residuals.
+    // 边缘化一帧，marg点和残差
     void marginalizeFrame ( FrameHessian* frame );
     void blockUntilMappingIsFinished();
 
