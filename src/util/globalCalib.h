@@ -38,7 +38,7 @@ extern float fxiG[PYR_LEVELS], fyiG[PYR_LEVELS], ///< 逆焦距
 
 extern Eigen::Matrix3f KG[PYR_LEVELS],KiG[PYR_LEVELS]; ///< 相机矩阵
 
-extern float wM3G;
+extern float wM3G; // = w -3; w Minus 3, Global
 extern float hM3G;
 
 void setGlobalCalib ( int w, int h, Eigen::Matrix3f K );

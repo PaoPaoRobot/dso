@@ -326,7 +326,7 @@ void PointFrameResidual::debugPlot()
 
 void PointFrameResidual::applyRes(bool copyJacobians)
 {
-	if(copyJacobians)
+	if(copyJacobians) // 根据residual更新 能量函数中的残差？
 	{
 		if(state_state == ResState::OOB)
 		{

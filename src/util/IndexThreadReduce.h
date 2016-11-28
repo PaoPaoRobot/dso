@@ -119,7 +119,7 @@ public:
 
 			// check if actually all are finished.
 			bool allDone = true;
-			for(int i=0;i<NUM_THREADS;i++)
+			for(int i=0;i<NUM_THREADS;i++) // #define NUM_THREADS 6
 				allDone = allDone && isDone[i];
 
 			// all are finished! exit.

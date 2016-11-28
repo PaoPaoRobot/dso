@@ -40,7 +40,7 @@ public:
 
 	// set once after tracking
 	SE3 camToTrackingRef;
-	FrameShell* trackingRef;
+	FrameShell* trackingRef; // 所对应的参考帧
 
 	// constantly adapted.
 	SE3 camToWorld;				// Write: TRACKING, while frame is still fresh; MAPPING: only when locked [shellPoseMutex].

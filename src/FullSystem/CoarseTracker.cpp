@@ -928,6 +928,7 @@ void CoarseDistanceMap::makeDistanceMap(
 			int u = ptp[0] / ptp[2] + 0.5f;
 			int v = ptp[1] / ptp[2] + 0.5f;
 			if(!(u > 0 && v > 0 && u < w[1] && v < h[1])) continue;
+      // 如果这个点能够投影到新的帧frame中
 			fwdWarpedIDDistFinal[u+w1*v]=0;
 			bfsList1[numItems] = Eigen::Vector2i(u,v);
 			numItems++;
@@ -950,14 +951,16 @@ void CoarseDistanceMap::makeInlierVotes(std::vector<FrameHessian*> frameHessians
 void CoarseDistanceMap::growDistBFS(int bfsNum)
 {
 	assert(w[0] != 0);
-	int w1 = w[1], h1 = h[1];
+	int w1 = w[1], h1 = h[1]; // 不是第0层？？Puzzle
+  // 循环40次，依次往外扩张，得到扩张后的 fwdWarpedIDDistFinal
 	for(int k=1;k<40;k++)
 	{
 		int bfsNum2 = bfsNum;
 		std::swap<Eigen::Vector2i*>(bfsList1,bfsList2);
 		bfsNum=0;
 
-		if(k%2==0)
+    // 为什么要奇偶用不同方式扩张，应该就是最后生成的扩张图不同罢了
+		if(k%2==0) // 偶数，往周围4个点扩张
 		{
 			for(int i=0;i<bfsNum2;i++)
 			{
@@ -988,7 +991,7 @@ void CoarseDistanceMap::growDistBFS(int bfsNum)
 				}
 			}
 		}
-		else
+		else // k 奇数，往周围8个点扩张
 		{
 			for(int i=0;i<bfsNum2;i++)
 			{
@@ -1053,7 +1056,7 @@ void CoarseDistanceMap::addIntoDistFinal(int u, int v)
 }
 
 
-
+// 设置每一层金字塔的内参
 void CoarseDistanceMap::makeK(CalibHessian* HCalib)
 {
 	w[0] = wG[0];

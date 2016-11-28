@@ -29,7 +29,7 @@
 namespace dso
 {
 
-
+// AccumulatorXX 有什么用？？ Puzzle
 template<int i, int j>
 /**
  * @brief block构建器
@@ -102,7 +102,7 @@ private:
 	  }
   }
 };
-
+// 11表示1*1的矩阵，就是一个float A;
 class Accumulator11
 {
 public:
@@ -123,6 +123,7 @@ public:
   inline void finish()
   {
 	shiftUp(true);
+  // 为什么要加起来 ？ Puzzle
 	A=SSEData1m[0+0] + SSEData1m[0+1] + SSEData1m[0+2] + SSEData1m[0+3];
   }
 
@@ -171,6 +172,7 @@ private:
   {
 	  if(numIn1 > 1000 || force)
 	  {
+      // SSEData1k += SSEData
 		  _mm_store_ps(SSEData1k, _mm_add_ps(_mm_load_ps(SSEData),_mm_load_ps(SSEData1k)));
 		  numIn1k+=numIn1; numIn1=0;
 		  memset(SSEData,0, sizeof(float)*4*1);
@@ -178,6 +180,7 @@ private:
 
 	  if(numIn1k > 1000 || force)
 	  {
+      // SSEData1m += SSEData1k
 		  _mm_store_ps(SSEData1m, _mm_add_ps(_mm_load_ps(SSEData1k),_mm_load_ps(SSEData1m)));
 		  numIn1m+=numIn1k;  numIn1k=0;
 		  memset(SSEData1k,0, sizeof(float)*4*1);
@@ -229,7 +232,7 @@ public:
   }
 
 private:
-  float numIn1, numIn1k, numIn1m;
+  float numIn1, numIn1k, numIn1m;// 应该是size_t 
 
   void shiftUp(bool force)
   {
@@ -1023,6 +1026,7 @@ public:
 	for(int r=0;r<9;r++)
 		for(int c=r;c<9;c++)
 		{
+      // 为什么要加起来？？ Puzzle
 			float d = SSEData1m[idx+0] + SSEData1m[idx+1] + SSEData1m[idx+2] + SSEData1m[idx+3];
 			H(r,c) = H(c,r) = d;
 			idx+=4;
@@ -1105,7 +1109,9 @@ public:
 
 
 
-
+  // should be updateSSE_weighted
+  // 加4是一个__m128, 因为 EIGEN_ALIGN16 float SSEData[4*45];  9+8+...+1= 45,
+  // 只存储上三角矩阵
   inline void updateSSE_eighted(
 		  const __m128 J0,const __m128 J1,
 		  const __m128 J2,const __m128 J3,

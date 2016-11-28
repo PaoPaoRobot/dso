@@ -76,7 +76,7 @@ CoarseInitializer::~CoarseInitializer()
     delete[] JbBuffer_new;
 }
 
-
+// 只用在初始化
 bool CoarseInitializer::trackFrame ( FrameHessian* newFrameHessian, std::vector<IOWrap::Output3DWrapper*> &wraps )
 {
     newFrame = newFrameHessian;                            ///< firstFrame已在setFirst设置
@@ -417,6 +417,7 @@ Vec3f CoarseInitializer::calcResAndGS (
             continue;
         }
 
+        // VecNRf is 8*1 float
         EIGEN_ALIGN16 VecNRf dp0;
         EIGEN_ALIGN16 VecNRf dp1;
         EIGEN_ALIGN16 VecNRf dp2;
@@ -432,6 +433,9 @@ Vec3f CoarseInitializer::calcResAndGS (
         // sum over all residuals.
         bool isGood = true;
         float energy=0;
+        // #define patternNum 8
+        // #define patternP staticPattern[8]
+        // #define patternPadding 2
         for ( int idx=0; idx<patternNum; idx++ )
         {
             int dx = patternP[idx][0];
@@ -442,7 +446,7 @@ Vec3f CoarseInitializer::calcResAndGS (
              * (Ku,Kv,1)^T = K(u,v,1)^T
              * 这里变到尺度为1进行计算
              */
-            Vec3f pt = RKi * Vec3f ( point->u+dx, point->v+dy, 1 ) + t*point->idepth_new;
+            Vec3f pt = RKi * Vec3f ( point->u+dx, point->v+dy, 1 ) + t*point->idepth_new; // 论文公式5
             float u = pt[0] / pt[2];
             float v = pt[1] / pt[2];
             float Ku = fxl * u + cxl;
@@ -455,6 +459,7 @@ Vec3f CoarseInitializer::calcResAndGS (
                 break;
             }
 
+            // wl: width level 某层的图像宽度;
             Vec3f hitColor = getInterpolatedElement33 ( colorNew, Ku, Kv, wl ); ///< 双线性插值
 
             float rlR = getInterpolatedElement31 ( colorRef, point->u+dx, point->v+dy, wl );
@@ -462,7 +467,7 @@ Vec3f CoarseInitializer::calcResAndGS (
             if ( !std::isfinite ( rlR ) || !std::isfinite ( ( float ) hitColor[0] ) )
             {
                 isGood = false;
-                break;
+                break; // 有一个pattern不对就直接跳出for
             }
 
             /** residual = I_new - (a * I_first + b)
@@ -471,8 +476,9 @@ Vec3f CoarseInitializer::calcResAndGS (
              *  注意，firstFrame上的点是不动的
              */
             float residual = hitColor[0] - r2new_aff[0] * rlR - r2new_aff[1];
+            // float setting_huberTH = 9
             float hw = fabs ( residual ) < setting_huberTH ? 1 : setting_huberTH / fabs ( residual );
-            energy += hw *residual*residual* ( 2-hw );
+            energy += hw *residual*residual* ( 2-hw ); // Puzzle ??
 
             /**
              * u = x / d
@@ -597,7 +603,7 @@ Vec3f CoarseInitializer::calcResAndGS (
         }
         else
         {
-            point->energy_new[1] = ( point->idepth_new-1 ) * ( point->idepth_new-1 );
+            point->energy_new[1] = ( point->idepth_new-1 ) * ( point->idepth_new-1 ); // ?? Puzzle
             E.updateSingle ( ( float ) ( point->energy_new[1] ) );
         }
     }
@@ -1116,6 +1122,7 @@ void CoarseInitializer::makeNN()
     KDTree* indexes[PYR_LEVELS];
     for ( int i=0; i<pyrLevelsUsed; i++ )
     {
+      //points 是上面 CoarseInitializer::setFirst 找到的梯度好的点？
         pcs[i] = FLANNPointcloud ( numPoints[i], points[i] );    ///< 初始化每一层的distance type
         indexes[i] = new KDTree ( 2, pcs[i], nanoflann::KDTreeSingleIndexAdaptorParams ( 5 ) );
         indexes[i]->buildIndex();                                ///< 生成index

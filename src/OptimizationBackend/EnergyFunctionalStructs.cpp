@@ -88,9 +88,9 @@ void EFResidual::fixLinearizationF(EnergyFunctional* ef)
 	Vec8f dp = ef->adHTdeltaF[hostIDX+ef->nFrames*targetIDX];
 
 	// compute Jp*delta
-	__m128 Jp_delta_x = _mm_set1_ps(J->Jpdxi[0].dot(dp.head<6>())
+	__m128 Jp_delta_x = _mm_set1_ps(J->Jpdxi[0].dot(dp.head<6>())  // _mm_set1_ps 把float 复制4个成 __m128
 								   +J->Jpdc[0].dot(ef->cDeltaF)
-								   +J->Jpdd[0]*point->deltaF);
+								   +J->Jpdd[0]*point->deltaF); // Jpdd是对 idepth 求导
 	__m128 Jp_delta_y = _mm_set1_ps(J->Jpdxi[1].dot(dp.head<6>())
 								   +J->Jpdc[1].dot(ef->cDeltaF)
 								   +J->Jpdd[1]*point->deltaF);

@@ -459,7 +459,7 @@ int main ( int argc, char** argv )
         {
             double tsThis = reader->getTimestamp ( idsToPlay[idsToPlay.size()-1] );
             double tsPrev = reader->getTimestamp ( idsToPlay[idsToPlay.size()-2] );
-            timesToPlayAt.push_back ( timesToPlayAt.back() +  fabs ( tsThis-tsPrev ) /playbackSpeed );
+            timesToPlayAt.push_back ( timesToPlayAt.back() +  fabs ( tsThis-tsPrev ) /playbackSpeed ); // playbackSpeed == 0 ?? Puzzle
         }
     }
 

@@ -46,7 +46,7 @@ void EnergyFunctional::setAdjointsF(CalibHessian* Hcalib)
 
 	if(adHost != 0) delete[] adHost;
 	if(adTarget != 0) delete[] adTarget;
-	adHost = new Mat88[nFrames*nFrames];
+	adHost = new Mat88[nFrames*nFrames]; // 不应该单独维护一个 nFrames ？
 	adTarget = new Mat88[nFrames*nFrames];
 
 	for(int h=0;h<nFrames;h++)
@@ -60,7 +60,7 @@ void EnergyFunctional::setAdjointsF(CalibHessian* Hcalib)
 			Mat88 AH = Mat88::Identity();
 			Mat88 AT = Mat88::Identity();
 
-			AH.topLeftCorner<6,6>() = -hostToTarget.Adj().transpose();
+			AH.topLeftCorner<6,6>() = -hostToTarget.Adj().transpose();  // Puzzle, Adj() 伴随变换？？
 			AT.topLeftCorner<6,6>() = Mat66::Identity();
 
 
@@ -82,9 +82,10 @@ void EnergyFunctional::setAdjointsF(CalibHessian* Hcalib)
 			adHost[h+t*nFrames] = AH;
 			adTarget[h+t*nFrames] = AT;
 		}
-	cPrior = VecC::Constant(setting_initialCalibHessian);
+	cPrior = VecC::Constant(setting_initialCalibHessian);  // setting_initialCalibHessian = 5e9
 
 
+  // 另外维护一个float类型的，有什么用？ Puzzle
 	if(adHostF != 0) delete[] adHostF;
 	if(adTargetF != 0) delete[] adTargetF;
 	adHostF = new Mat88f[nFrames*nFrames];
@@ -165,15 +166,16 @@ EnergyFunctional::~EnergyFunctional()
 
 
 
-
+// 后缀 F 表示 float ？
 void EnergyFunctional::setDeltaF(CalibHessian* HCalib)
 {
 	if(adHTdeltaF != 0) delete[] adHTdeltaF;
-	adHTdeltaF = new Mat18f[nFrames*nFrames];
+	adHTdeltaF = new Mat18f[nFrames*nFrames]; // 1*8的矩阵
 	for(int h=0;h<nFrames;h++)
 		for(int t=0;t<nFrames;t++)
 		{
 			int idx = h+t*nFrames;
+      // 1*8 乘以 8*8
 			adHTdeltaF[idx] = frames[h]->data->get_state_minus_stateZero().head<8>().cast<float>().transpose() * adHostF[idx]
 					        +frames[t]->data->get_state_minus_stateZero().head<8>().cast<float>().transpose() * adTargetF[idx];
 		}
@@ -185,7 +187,7 @@ void EnergyFunctional::setDeltaF(CalibHessian* HCalib)
 		f->delta_prior = (f->data->get_state() - f->data->getPriorZero()).head<8>();
 
 		for(EFPoint* p : f->points)
-			p->deltaF = p->data->idepth-p->data->idepth_zero;
+			p->deltaF = p->data->idepth-p->data->idepth_zero; // Puzzle..
 	}
 
 	EFDeltaValid = true;
@@ -436,12 +438,13 @@ EFFrame* EnergyFunctional::insertFrame(FrameHessian* fh, CalibHessian* Hcalib)
 {
 	EFFrame* eff = new EFFrame(fh);
 	eff->idx = frames.size();
-	frames.push_back(eff);
+	frames.push_back(eff); // std::vector<EFFrame*> frames;
 
 	nFrames++;
 	fh->efFrame = eff;
 
-	assert(HM.cols() == 8*nFrames+CPARS-8);
+	assert(HM.cols() == 8*nFrames+CPARS-8);  // #define CPARS 4
+  //  conservativeResize 重新缩放vector的size，保留旧值
 	bM.conservativeResize(8*nFrames+CPARS);
 	HM.conservativeResize(8*nFrames+CPARS,8*nFrames+CPARS);
 	bM.tail<8>().setZero();
@@ -452,10 +455,11 @@ EFFrame* EnergyFunctional::insertFrame(FrameHessian* fh, CalibHessian* Hcalib)
 	EFAdjointsValid=false;
 	EFDeltaValid=false;
 
+  // 对当前frames(压入了新的eff)，重新计算...
 	setAdjointsF(Hcalib);
 	makeIDX();
 
-
+  // 添加新的帧和原来帧之间的connectivityMap， connectivityMap是个map
 	for(EFFrame* fh2 : frames)
 	{
 		connectivityMap[(((long)eff->frameID) << 32) + ((long)fh2->frameID)] = Eigen::Vector2i(0,0);
@@ -925,6 +929,7 @@ void EnergyFunctional::solveSystemF(int iteration, double lambda, CalibHessian* 
 }
 void EnergyFunctional::makeIDX()
 {
+  // 重新计算id, 有什么用？？ Puzzle
 	for(unsigned int idx=0;idx<frames.size();idx++)
 		frames[idx]->idx = idx;
 

@@ -124,9 +124,10 @@ struct FrameHessian {
 
 
 
-    int frameID;						// incremental ID for keyframes only!
+    int frameID;						// incremental ID for keyframes only!  在 allKeyFramesHistory 这个vector中的id
     static int instanceCounter; // 引用计数？怎么不用shared_ptr
-    int idx; // 怎么又一个id，这是啥鸟东西 
+    int idx; // 怎么又一个id，这是啥鸟东西 , 在frameHessians这个vector中的id(在vector的第几个元素)
+    // frameHessians 是滑动的
 
     // Photometric Calibration Stuff
     float frameEnergyTH;	// set dynamically depending on tracking residual
@@ -146,10 +147,10 @@ struct FrameHessian {
     Vec6 nullspaces_scale;
 
     // variable info.
-    SE3 worldToCam_evalPT;
+    SE3 worldToCam_evalPT;// Puzzle ， 和下面 PRE_worldToCam 有什么区别？
     Vec10 state_zero;
     Vec10 state_scaled;
-    Vec10 state;	// [0-5: worldToCam-leftEps. 6-7: a,b] 
+    Vec10 state;	// [0-5: worldToCam-leftEps. 6-7: a,b] 前6个是位姿，后4个是曝光？
     Vec10 step;
     Vec10 step_backup;
     Vec10 state_backup;
@@ -262,7 +263,7 @@ struct FrameHessian {
         flaggedForMarginalization=false;
         frameID = -1;
         efFrame = 0;
-        frameEnergyTH = 8*8*patternNum;
+        frameEnergyTH = 8*8*patternNum; // 默认 512 ？
 
 
 
@@ -277,7 +278,7 @@ struct FrameHessian {
     inline Vec10 getPrior() {
         Vec10 p =  Vec10::Zero();
         if ( frameID==0 ) {
-            p.head<3>() = Vec3::Constant ( setting_initialTransPrior );
+            p.head<3>() = Vec3::Constant ( setting_initialTransPrior ); // 默认 1e10, 不是太大了吗？？ Puzzle
             p.segment<3> ( 3 ) = Vec3::Constant ( setting_initialRotPrior );
             if ( setting_solverMode & SOLVER_REMOVE_POSEPRIOR ) {
                 p.head<6>().setZero();
@@ -376,11 +377,14 @@ struct CalibHessian {
     inline void setValue ( VecC value ) {
         // [0-3: Kl, 4-7: Kr, 8-12: l2r]
         this->value = value;
+        // #define SCALE_F 50.0f
+        // #define SCALE_C 50.0f
         value_scaled[0] = SCALE_F * value[0];
         value_scaled[1] = SCALE_F * value[1];
         value_scaled[2] = SCALE_C * value[2];
         value_scaled[3] = SCALE_C * value[3];
 
+        // K^(-1)
         this->value_scaledf = this->value_scaled.cast<float>();
         this->value_scaledi[0] = 1.0f / this->value_scaledf[0];
         this->value_scaledi[1] = 1.0f / this->value_scaledf[1];
@@ -492,7 +496,9 @@ struct PointHessian {
     }
 
 
+    // 某个点在很多个frame中的误差
     std::vector<PointFrameResidual*> residuals;					// only contains good residuals (not OOB and not OUTLIER). Arbitrary order.
+    // 这个点在最近两帧中的状态
     std::pair<PointFrameResidual*, ResState> lastResiduals[2]; 	// contains information about residuals to the last two (!) frames. ([0] = latest, [1] = the one before).
 
 
@@ -505,9 +511,11 @@ struct PointHessian {
     };
 
 
+    // 这个点是否超出边界，参数toKeep没有用到
     inline bool isOOB ( const std::vector<FrameHessian*>& toKeep, const std::vector<FrameHessian*>& toMarg ) const {
 
         int visInToMarg = 0;
+         // 统计好的残差点，有多少个在toMarg中
         for ( PointFrameResidual* r : residuals ) {
             if ( r->state_state != ResState::IN ) {
                 continue;

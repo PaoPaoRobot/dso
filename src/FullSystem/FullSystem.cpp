@@ -289,7 +289,7 @@ void FullSystem::printResult ( std::string file )
     myfile.close();
 }
 
-
+// tracK NewCoarse
 Vec4 FullSystem::trackNewCoarse ( FrameHessian* fh )
 {
 
@@ -506,7 +506,7 @@ Vec4 FullSystem::trackNewCoarse ( FrameHessian* fh )
 
     return Vec4 ( achievedRes[0], flowVecs[0], flowVecs[1], flowVecs[2] );
 }
-
+// tracE NewCoarse
 void FullSystem::traceNewCoarse ( FrameHessian* fh )
 {
     boost::unique_lock<boost::mutex> lock ( mapMutex );
@@ -580,20 +580,22 @@ void FullSystem::activatePointsMT_Reductor (
     ImmaturePointTemporaryResidual* tr = new ImmaturePointTemporaryResidual[frameHessians.size()];
     for ( int k=min; k<max; k++ )
     {
+      // 优化ImmaturePoint 为 PointHessian
         ( *optimized ) [k] = optimizeImmaturePoint ( ( *toOptimize ) [k],1,tr );
     }
     delete[] tr;
 }
 
 
-
+// MT： MultiThread ??
 void FullSystem::activatePointsMT()
 {
-
+    // setting_desiredPointDensity = 2000 or 800 ?
     if ( ef->nPoints < setting_desiredPointDensity*0.66 )
     {
         currentMinActDist -= 0.8;
     }
+    // 少了 else. FindBug
     if ( ef->nPoints < setting_desiredPointDensity*0.8 )
     {
         currentMinActDist -= 0.5;
@@ -607,6 +609,7 @@ void FullSystem::activatePointsMT()
         currentMinActDist -= 0.1;
     }
 
+    // 应该都少了 else, FindBug
     if ( ef->nPoints > setting_desiredPointDensity*1.5 )
     {
         currentMinActDist += 0.8;
@@ -665,10 +668,11 @@ void FullSystem::activatePointsMT()
 
         for ( unsigned int i=0; i<host->immaturePoints.size(); i+=1 )
         {
-            ImmaturePoint* ph = host->immaturePoints[i];
-            ph->idxInImmaturePoints = i;
+            ImmaturePoint* ph = host->immaturePoints[i]; // ph 不是PointHessian !
+            ph->idxInImmaturePoints = i; // 更新索引
 
             // delete points that have never been traced successfully, or that are outlier on the last trace.
+            // 如果这个点没有被成功trace过，那么 idepth_max是NAN，就直接删除这个点
             if ( !std::isfinite ( ph->idepth_max ) || ph->lastTraceStatus == IPS_OUTLIER )
             {
 //				immature_invalid_deleted++;
@@ -684,7 +688,7 @@ void FullSystem::activatePointsMT()
                                  || ph->lastTraceStatus == IPS_BADCONDITION
                                  || ph->lastTraceStatus == IPS_OOB )
                                && ph->lastTracePixelInterval < 8
-                               && ph->quality > setting_minTraceQuality
+                               && ph->quality > setting_minTraceQuality  // 这个点质量比较好
                                && ( ph->idepth_max+ph->idepth_min ) > 0;
 
 
@@ -762,7 +766,7 @@ void FullSystem::activatePointsMT()
             newpoint->host->immaturePoints[ph->idxInImmaturePoints]=0;
             newpoint->host->pointHessians.push_back ( newpoint );
             newpoint->host->statistics_pointsActivatedForThisFrame++;
-            ef->insertPoint ( newpoint );
+            ef->insertPoint ( newpoint ); // 创建对应的EFPoint
             for ( PointFrameResidual* r : newpoint->residuals )
             {
                 ef->insertResidual ( r );
@@ -782,8 +786,10 @@ void FullSystem::activatePointsMT()
     }
 
 
+    // 把标记为删除immaturePoints 删除
     for ( FrameHessian* host : frameHessians )
     {
+      // 好像有问题，host->immaturePoints.size() 会在for刚开始就确认？
         for ( int i=0; i< ( int ) host->immaturePoints.size(); i++ )
         {
             if ( host->immaturePoints[i]==0 )
@@ -947,7 +953,7 @@ void FullSystem::addActiveFrame ( ImageAndExposure* image, int id )
         else if ( coarseInitializer->trackFrame ( fh, outputWrapper ) )	// if SNAPPED
         {
             // 初始化
-            initializeFromInitializer ( fh );
+            initializeFromInitializer ( fh ); // 会让 initialized=true;
             lock.unlock();
             deliverTrackedFrame ( fh, true );
         }
@@ -1176,8 +1182,8 @@ void FullSystem::makeKeyFrame ( FrameHessian* fh )
     {
         boost::unique_lock<boost::mutex> crlock ( shellPoseMutex );
         assert ( fh->shell->trackingRef != 0 );
-        fh->shell->camToWorld = fh->shell->trackingRef->camToWorld * fh->shell->camToTrackingRef;
-        fh->setEvalPT_scaled ( fh->shell->camToWorld.inverse(),fh->shell->aff_g2l );
+        fh->shell->camToWorld = fh->shell->trackingRef->camToWorld * fh->shell->camToTrackingRef; // Puzzle, fh->shell->camToTrackingRef 哪里设置
+        fh->setEvalPT_scaled ( fh->shell->camToWorld.inverse(),fh->shell->aff_g2l ); // Puzzle, fh->shell->aff_g2l 在哪里设置
     }
 
     traceNewCoarse ( fh );
@@ -1192,7 +1198,7 @@ void FullSystem::makeKeyFrame ( FrameHessian* fh )
     fh->idx = frameHessians.size();
     frameHessians.push_back ( fh );
     fh->frameID = allKeyFramesHistory.size();
-    allKeyFramesHistory.push_back ( fh->shell );
+    allKeyFramesHistory.push_back ( fh->shell ); // 压入的是shell
     ef->insertFrame ( fh, &Hcalib );
 
     setPrecalcValues();
@@ -1207,7 +1213,7 @@ void FullSystem::makeKeyFrame ( FrameHessian* fh )
         {
             continue;
         }
-        for ( PointHessian* ph : fh1->pointHessians )
+        for ( PointHessian* ph : fh1->pointHessians ) // 旧帧中所有点和新帧都会有一个残差？ Puzzle
         {
             PointFrameResidual* r = new PointFrameResidual ( ph, fh1, fh );
             r->setState ( ResState::IN );
@@ -1471,6 +1477,7 @@ void FullSystem::makeNewTraces ( FrameHessian* newFrame, float* gtDepth )
 
 void FullSystem::setPrecalcValues()
 {
+  // 计算frameHessians 中矩阵之间的变换矩阵和AffLight, 调用FrameFramePrecalc::set
     for ( FrameHessian* fh : frameHessians )
     {
         fh->targetPrecalc.resize ( frameHessians.size() );

@@ -50,7 +50,7 @@ typedef Sophus::Sim3d Sim3;
 typedef Sophus::SO3d SO3;
 
 
-
+// 相机内参4个参数
 #define CPARS 4
 
 
@@ -119,7 +119,7 @@ typedef Eigen::Matrix<double,8,4> Mat84;
 typedef Eigen::Matrix<double,4,8> Mat48;
 typedef Eigen::Matrix<double,4,4> Mat44;
 
-
+// MAX_RES_PER_POINT is 8
 typedef Eigen::Matrix<float,MAX_RES_PER_POINT,1> VecNRf;
 typedef Eigen::Matrix<float,12,1> Vec12f;
 typedef Eigen::Matrix<float,1,8> Mat18f;
